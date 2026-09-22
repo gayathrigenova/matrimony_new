@@ -108,10 +108,10 @@ TEMPLATES = [
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        "NAME": os.getenv("DB_NAME", "matrimony_db"),
+        "NAME": os.getenv("DB_NAME", "railway"),
         "USER": os.getenv("DB_USER", "root"),
-        "PASSWORD": os.getenv("DB_PASSWORD", ""),
-        "HOST": os.getenv("DB_HOST", "localhost"),
+        "PASSWORD": os.getenv("DB_PASSWORD", "QEAdICNwFUQssicAtKJsBWFhudUfmneT"),
+        "HOST": os.getenv("DB_HOST", "mysql.railway.internal"),
         "PORT": os.getenv("DB_PORT", "3306"),
     }
 }

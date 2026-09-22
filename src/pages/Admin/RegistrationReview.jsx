@@ -102,7 +102,7 @@ export default function RegistrationReview() {
     try {
       setActionLoading(true);
 
-      const url = `https://matrimonydjango.onrender.com/api/adminpanel/registrations/${id}/${action}/`;
+      const url = `http://127.0.0.1:8000/api/adminpanel/registrations/${id}/${action}/`;
 
       const body =
         action === "correction" || action === "reject"

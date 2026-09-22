@@ -125,7 +125,7 @@ export default function RegistrationStep3() {
       // SEND TO DJANGO BACKEND
       // =========================
       const response = await fetch(
-        "https://matrimonydjango.onrender.com/api/registrations/",
+        "http://127.0.0.1:8000/api/registrations/",
         {
           method: "POST",
           headers: {

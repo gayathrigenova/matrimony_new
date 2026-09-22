@@ -16,7 +16,7 @@ export default function Login() {
 
     try {
       const response = await fetch(
-        "https://matrimonydjango.onrender.com/api/accounts/login/",
+        "http://127.0.0.1:8000/api/accounts/login/",
         {
           method: "POST",
           headers: {

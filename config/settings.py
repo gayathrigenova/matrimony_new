@@ -110,7 +110,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.mysql",
         "NAME": os.getenv("DB_NAME", "railway"),
         "USER": os.getenv("DB_USER", "root"),
-        "PASSWORD": os.getenv("DB_PASSWORD", "QEAdICNwFUQssicAtKJsBWFhudUfmneT"),
+        "PASSWORD": os.getenv("DB_PASSWORD", "myBTwaHmmrHDlCFXWGDpRtciAwjoCHWH"),
         "HOST": os.getenv("DB_HOST", "mysql.railway.internal"),
         "PORT": os.getenv("DB_PORT", "3306"),
     }

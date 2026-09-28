@@ -13,19 +13,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY
 # =========================================================
 
-SECRET_KEY = os.getenv(
-    "DJANGO_SECRET_KEY",
-    "django-insecure-change-this-for-production"
-)
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-local-development-only")
 
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 
 ALLOWED_HOSTS = [
-    "matrimonydjango.onrender.com",
-    "localhost",
-    "127.0.0.1",
+    host.strip()
+    for host in os.getenv(
+        "DJANGO_ALLOWED_HOSTS",
+        "matrimonynew-production.up.railway.app,localhost,127.0.0.1",
+    ).split(",")
+    if host.strip()
 ]
-
 
 # =========================================================
 # APPLICATIONS
@@ -105,16 +104,28 @@ TEMPLATES = [
 # DATABASE
 # =========================================================
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.mysql",
-        "NAME": os.getenv("DB_NAME", "railway"),
-        "USER": os.getenv("DB_USER", "root"),
-        "PASSWORD": os.getenv("DB_PASSWORD", "myBTwaHmmrHDlCFXWGDpRtciAwjoCHWH"),
-        "HOST": os.getenv("DB_HOST", "mysql.railway.internal"),
-        "PORT": os.getenv("DB_PORT", "3306"),
+DB_HOST = os.getenv("DB_HOST") or os.getenv("MYSQLHOST")
+if DB_HOST:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.mysql",
+            "NAME": os.getenv("DB_NAME", os.getenv("MYSQLDATABASE", "matrimony_db")),
+            "USER": os.getenv("DB_USER", os.getenv("MYSQLUSER", "root")),
+            "PASSWORD": os.getenv("DB_PASSWORD", os.getenv("MYSQLPASSWORD", "")),
+            "HOST": DB_HOST,
+            "PORT": os.getenv("DB_PORT", os.getenv("MYSQLPORT", "3306")),
+        }
     }
-}
+elif os.getenv("RAILWAY_ENVIRONMENT"):
+    raise RuntimeError("Set MYSQLHOST and the Railway MySQL credentials for deployment.")
+else:
+    # Local development works without a separately installed MySQL server.
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 
 # =========================================================
@@ -176,6 +187,19 @@ USE_TZ = True
 STATIC_URL = "/static/"
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
+try:
+    import whitenoise  # noqa: F401
+except ImportError:
+    STATICFILES_BACKEND = "django.contrib.staticfiles.storage.StaticFilesStorage"
+    HAS_WHITENOISE = False
+else:
+    STATICFILES_BACKEND = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+    HAS_WHITENOISE = True
+
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": STATICFILES_BACKEND},
+}
 
 
 # =========================================================
@@ -207,8 +231,18 @@ REST_FRAMEWORK = {
 # =========================================================
 
 CORS_ALLOWED_ORIGINS = [
-    "https://matrimony-sepia-phi.vercel.app",
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ALLOWED_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173,https://matrimony-sepia-phi.vercel.app",
+    ).split(",")
+    if origin.strip()
 ]
+
+# WhiteNoise is installed by the deployment requirements. Keep local startup
+# usable before optional production dependencies have been installed.
+if HAS_WHITENOISE:
+    MIDDLEWARE.insert(2, "whitenoise.middleware.WhiteNoiseMiddleware")
 
 
 # =========================================================
@@ -216,9 +250,22 @@ CORS_ALLOWED_ORIGINS = [
 # =========================================================
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://matrimony-sepia-phi.vercel.app",
-    "https://matrimonydjango.onrender.com",
+    origin.strip()
+    for origin in os.getenv(
+        "CSRF_TRUSTED_ORIGINS",
+        "https://matrimony-sepia-phi.vercel.app,https://matrimonydjango.onrender.com",
+    ).split(",")
+    if origin.strip()
 ]
+
+# Railway terminates TLS at its proxy. Enforce HTTPS and secure cookies only
+# in Railway; the local development server speaks plain HTTP.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+IS_RAILWAY = bool(os.getenv("RAILWAY_ENVIRONMENT"))
+if IS_RAILWAY:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 
 # =========================================================

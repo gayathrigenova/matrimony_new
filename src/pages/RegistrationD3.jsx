@@ -1,3 +1,4 @@
+import { API_URL } from "../api.js";
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "./RegistrationD3.css";
@@ -125,7 +126,7 @@ export default function RegistrationStep3() {
       // SEND TO DJANGO BACKEND
       // =========================
       const response = await fetch(
-        "http://127.0.0.1:8000/api/registrations/",
+        `${API_URL}/registrations/`,
         {
           method: "POST",
           headers: {
@@ -196,41 +197,41 @@ export default function RegistrationStep3() {
       {/* =====================================
           STEP PROGRESS
       ====================================== */}
-      <div className="reg-step-bar">
+      <div className="reg3-step-bar">
 
         {/* Step 1 */}
-        <div className="reg-step-item">
-          <div className="reg-step-circle completed">
-            ✓
+        <div className="reg3-step-item">
+          <div className="reg3-step-circle completed">
+            &#10003;
           </div>
 
-          <span className="reg-step-label">
+          <span className="reg3-step-label">
             Basic Info
           </span>
         </div>
 
-        <div className="reg-step-line done"></div>
+        <div className="reg3-step-line done"></div>
 
         {/* Step 2 */}
-        <div className="reg-step-item">
-          <div className="reg-step-circle completed">
-            ✓
+        <div className="reg3-step-item">
+          <div className="reg3-step-circle completed">
+            &#10003;
           </div>
 
-          <span className="reg-step-label">
+          <span className="reg3-step-label">
             Education
           </span>
         </div>
 
-        <div className="reg-step-line done"></div>
+        <div className="reg3-step-line done"></div>
 
         {/* Step 3 */}
-        <div className="reg-step-item">
-          <div className="reg-step-circle active">
+        <div className="reg3-step-item">
+          <div className="reg3-step-circle active">
             3
           </div>
 
-          <span className="reg-step-label">
+          <span className="reg3-step-label">
             Family
           </span>
         </div>
@@ -239,20 +240,20 @@ export default function RegistrationStep3() {
       {/* =====================================
           REGISTRATION PAGE
       ====================================== */}
-      <div className="registration3-page">
-        <div className="registration3-container">
+      <div className="reg3-page">
+        <div className="reg3-container">
 
           <form onSubmit={handleSubmit}>
 
             {/* =================================
                 FAMILY DETAILS
             ================================== */}
-            <h2 className="section-title">
+            <h2 className="reg3-section-title">
               Family Details
             </h2>
 
             {/* Father's Name */}
-            <div className="form-group">
+            <div className="reg3-form-group">
               <label>
                 Father's Name <span>*</span>
               </label>
@@ -267,7 +268,7 @@ export default function RegistrationStep3() {
             </div>
 
             {/* Father's Occupation */}
-            <div className="form-group">
+            <div className="reg3-form-group">
               <label>
                 Father's Status / Occupation <span>*</span>
               </label>
@@ -282,7 +283,7 @@ export default function RegistrationStep3() {
             </div>
 
             {/* Mother's Name */}
-            <div className="form-group">
+            <div className="reg3-form-group">
               <label>
                 Mother's Name <span>*</span>
               </label>
@@ -297,7 +298,7 @@ export default function RegistrationStep3() {
             </div>
 
             {/* Mother's Occupation */}
-            <div className="form-group">
+            <div className="reg3-form-group">
               <label>
                 Mother's Status / Occupation <span>*</span>
               </label>
@@ -312,7 +313,7 @@ export default function RegistrationStep3() {
             </div>
 
             {/* Brothers */}
-            <div className="form-group">
+            <div className="reg3-form-group">
               <label>
                 No of Brothers <span>*</span>
               </label>
@@ -332,7 +333,7 @@ export default function RegistrationStep3() {
             </div>
 
             {/* Married Brothers */}
-            <div className="form-group">
+            <div className="reg3-form-group">
               <label>
                 No of Brothers Married <span>*</span>
               </label>
@@ -352,7 +353,7 @@ export default function RegistrationStep3() {
             </div>
 
             {/* Sisters */}
-            <div className="form-group">
+            <div className="reg3-form-group">
               <label>
                 No of Sisters <span>*</span>
               </label>
@@ -372,7 +373,7 @@ export default function RegistrationStep3() {
             </div>
 
             {/* Married Sisters */}
-            <div className="form-group">
+            <div className="reg3-form-group">
               <label>
                 No of Sisters Married <span>*</span>
               </label>
@@ -392,7 +393,7 @@ export default function RegistrationStep3() {
             </div>
 
             {/* Financial Level */}
-            <div className="form-group">
+            <div className="reg3-form-group">
               <label>
                 Family Financial Level <span>*</span>
               </label>
@@ -422,7 +423,7 @@ export default function RegistrationStep3() {
             </div>
 
             {/* About Family */}
-            <div className="form-group">
+            <div className="reg3-form-group">
               <label>
                 About You & Family
               </label>
@@ -436,30 +437,17 @@ export default function RegistrationStep3() {
               />
             </div>
 
-            {/* Auto Fill */}
-            <div className="autofill">
-              <label>
-                <input
-                  type="checkbox"
-                  name="autoFill"
-                />
-
-                Help me to fill about details
-                (Auto filling)
-              </label>
-            </div>
-
-            <hr className="section-divider" />
+            <hr className="reg3-section-divider" />
 
             {/* =================================
                 PERMANENT ADDRESS
             ================================== */}
-            <h2 className="section-title">
+            <h2 className="reg3-section-title">
               Permanent / Native Address
             </h2>
 
             {/* Place */}
-            <div className="form-group">
+            <div className="reg3-form-group">
               <label>
                 Place <span>*</span>
               </label>
@@ -489,7 +477,7 @@ export default function RegistrationStep3() {
             </div>
 
             {/* House Name */}
-            <div className="form-group">
+            <div className="reg3-form-group">
               <label>
                 House Name / Flat Name & No.{" "}
                 <span>*</span>
@@ -505,7 +493,7 @@ export default function RegistrationStep3() {
             </div>
 
             {/* Bus Stop */}
-            <div className="form-group">
+            <div className="reg3-form-group">
               <label>
                 Place / Bus Stop <span>*</span>
               </label>
@@ -520,7 +508,7 @@ export default function RegistrationStep3() {
             </div>
 
             {/* Post Office */}
-            <div className="form-group">
+            <div className="reg3-form-group">
               <label>
                 Post Office / Pin Code <span>*</span>
               </label>
@@ -535,7 +523,7 @@ export default function RegistrationStep3() {
             </div>
 
             {/* Taluk */}
-            <div className="form-group">
+            <div className="reg3-form-group">
               <label>
                 Taluk <span>*</span>
               </label>
@@ -573,7 +561,7 @@ export default function RegistrationStep3() {
             </div>
 
             {/* Village */}
-            <div className="form-group">
+            <div className="reg3-form-group">
               <label>
                 Village <span>*</span>
               </label>
@@ -602,17 +590,17 @@ export default function RegistrationStep3() {
               </select>
             </div>
 
-            <hr className="section-divider" />
+            <hr className="reg3-section-divider" />
 
             {/* =================================
                 CONTACT DETAILS
             ================================== */}
-            <h2 className="section-title">
+            <h2 className="reg3-section-title">
               Contact Details
             </h2>
 
             {/* Contact Person */}
-            <div className="form-group">
+            <div className="reg3-form-group">
               <label>
                 Contact Person Name <span>*</span>
               </label>
@@ -627,7 +615,7 @@ export default function RegistrationStep3() {
             </div>
 
             {/* Relationship */}
-            <div className="form-group">
+            <div className="reg3-form-group">
               <label>
                 Relationship <span>*</span>
               </label>
@@ -642,12 +630,12 @@ export default function RegistrationStep3() {
             </div>
 
             {/* Phone */}
-            <div className="form-group">
+            <div className="reg3-form-group">
               <label>
                 Phone Number <span>*</span>
               </label>
 
-              <div className="phone-row">
+              <div className="reg3-phone-row">
 
                 <select
                   name="countryCode"
@@ -656,23 +644,23 @@ export default function RegistrationStep3() {
                   required
                 >
                   <option value="+91">
-                    🇮🇳 +91
+                    India +91
                   </option>
 
                   <option value="+971">
-                    🇦🇪 +971
+                    UAE +971
                   </option>
 
                   <option value="+966">
-                    🇸🇦 +966
+                    Saudi Arabia +966
                   </option>
 
                   <option value="+1">
-                    🇺🇸 +1
+                    USA +1
                   </option>
 
                   <option value="+44">
-                    🇬🇧 +44
+                    UK +44
                   </option>
                 </select>
 
@@ -688,7 +676,7 @@ export default function RegistrationStep3() {
             </div>
 
             {/* Additional Phone */}
-            <div className="form-group">
+            <div className="reg3-form-group">
               <label>
                 Additional Contact Number
               </label>
@@ -705,16 +693,17 @@ export default function RegistrationStep3() {
             {/* =================================
                 TERMS
             ================================== */}
-            <div className="checkbox-row">
+            <div className="reg3-checkbox-row">
               <input
                 type="checkbox"
                 name="acceptTerms"
+                id="acceptTerms"
                 checked={formData.acceptTerms}
                 onChange={handleChange}
                 required
               />
 
-              <label>
+              <label htmlFor="acceptTerms">
                 I agree to the
                 <a href="#">
                   {" "}Terms &amp; Conditions{" "}
@@ -732,7 +721,7 @@ export default function RegistrationStep3() {
             ================================== */}
             <button
               type="submit"
-              className="register-btn"
+              className="reg3-register-btn"
             >
               REGISTER NOW
             </button>

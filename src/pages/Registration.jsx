@@ -11,9 +11,7 @@ export default function Registration() {
   const [formData, setFormData] = useState({
     name: prefill.name || "",
     gender: prefill.gender || "",
-    day: "",
-    month: "",
-    year: "",
+    date_of_birth: "",
     maritalStatus: "",
     caste: "",
     email: "",
@@ -39,36 +37,17 @@ export default function Registration() {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    const monthMap = {
-      Jan: "01",
-      Feb: "02",
-      Mar: "03",
-      Apr: "04",
-      May: "05",
-      Jun: "06",
-      Jul: "07",
-      Aug: "08",
-      Sep: "09",
-      Oct: "10",
-      Nov: "11",
-      Dec: "12",
-    };
-
     // Validate DOB
-    if (!formData.day || !formData.month || !formData.year) {
+    if (!formData.date_of_birth) {
       alert("Please select your complete date of birth.");
       return;
     }
-
-    const dateOfBirth = `${formData.year}-${
-      monthMap[formData.month]
-    }-${String(formData.day).padStart(2, "0")}`;
 
     // Registration data
     const registrationData = {
       full_name: formData.name.trim(),
       gender: formData.gender,
-      date_of_birth: dateOfBirth,
+      date_of_birth: formData.date_of_birth,
       marital_status: formData.maritalStatus,
       caste: formData.caste,
       source: formData.source,
@@ -86,40 +65,8 @@ export default function Registration() {
     });
   };
 
-  // =========================
-  // DAYS
-  // =========================
-  const days = Array.from(
-    { length: 31 },
-    (_, i) => i + 1
-  );
-
-  // =========================
-  // MONTHS
-  // =========================
-  const months = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
-
-  // =========================
-  // YEARS
-  // =========================
-  const years = [];
-
-  for (let i = 1980; i <= 2010; i++) {
-    years.push(i);
-  }
+  const minDateOfBirth = "1980-01-01";
+  const maxDateOfBirth = "2010-12-31";
 
   return (
     <div className="registration-page-wrapper">
@@ -259,76 +206,15 @@ export default function Registration() {
               </label>
 
               <div className="registration-dob">
-
-                {/* DAY */}
-                <select
-                  name="day"
-                  value={formData.day}
+                <input
+                  type="date"
+                  name="date_of_birth"
+                  value={formData.date_of_birth}
                   onChange={handleChange}
+                  min={minDateOfBirth}
+                  max={maxDateOfBirth}
                   required
-                >
-
-                  <option value="">
-                    Day
-                  </option>
-
-                  {days.map((day) => (
-                    <option
-                      key={day}
-                      value={day}
-                    >
-                      {day}
-                    </option>
-                  ))}
-
-                </select>
-
-                {/* MONTH */}
-                <select
-                  name="month"
-                  value={formData.month}
-                  onChange={handleChange}
-                  required
-                >
-
-                  <option value="">
-                    Month
-                  </option>
-
-                  {months.map((month) => (
-                    <option
-                      key={month}
-                      value={month}
-                    >
-                      {month}
-                    </option>
-                  ))}
-
-                </select>
-
-                {/* YEAR */}
-                <select
-                  name="year"
-                  value={formData.year}
-                  onChange={handleChange}
-                  required
-                >
-
-                  <option value="">
-                    Year
-                  </option>
-
-                  {years.map((year) => (
-                    <option
-                      key={year}
-                      value={year}
-                    >
-                      {year}
-                    </option>
-                  ))}
-
-                </select>
-
+                />
               </div>
 
             </div>

@@ -1,8 +1,8 @@
+import { API_URL } from "../api.js";
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "../pages/ClientDashboard.css";
 
-const API_URL = "https://matrimonydjango.onrender.com/api";
 
 export default function ClientLayout({ children }) {
   const navigate = useNavigate();

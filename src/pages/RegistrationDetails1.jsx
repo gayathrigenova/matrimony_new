@@ -85,8 +85,8 @@ export default function RegistrationDetails1() {
   return (
     <>
       {/* Banner */}
-      <section className="registration-banner">
-        <div className="banner-overlay">
+      <section className="rd1-banner">
+        <div className="rd1-banner-content">
           <h1>Find Your Perfect Match</h1>
           <p>
             Join thousands of happy couples who found their life
@@ -96,37 +96,43 @@ export default function RegistrationDetails1() {
       </section>
 
       {/* Step Bar */}
-      <div className="reg-step-bar">
-        <div className="reg-step-item">
-          <div className="reg-step-circle completed">1</div>
-          <span className="reg-step-label">Basic Info</span>
+      <div className="rd1-step-bar">
+        <div className="rd1-step-item">
+          <div className="rd1-step-circle completed">1</div>
+          <span className="rd1-step-label">Basic Info</span>
         </div>
 
-        <div className="reg-step-line active"></div>
+        <div className="rd1-step-line active"></div>
 
-        <div className="reg-step-item">
-          <div className="reg-step-circle active">2</div>
-          <span className="reg-step-label">Education</span>
+        <div className="rd1-step-item">
+          <div className="rd1-step-circle active">2</div>
+          <span className="rd1-step-label">Education</span>
         </div>
 
-        <div className="reg-step-line"></div>
+        <div className="rd1-step-line"></div>
 
-        <div className="reg-step-item">
-          <div className="reg-step-circle">3</div>
-          <span className="reg-step-label">Family</span>
+        <div className="rd1-step-item">
+          <div className="rd1-step-circle">3</div>
+          <span className="rd1-step-label">Family</span>
         </div>
       </div>
 
       {/* Registration Form */}
-      <div className="registration-page">
-        <div className="registration-container">
-          <form onSubmit={handleSubmit}>
+      <div className="rd1-page">
+        <div className="rd1-container">
+          <form className="rd1-form" onSubmit={handleSubmit}>
+            <div className="rd1-form-heading">
+              <span className="rd1-eyebrow">STEP 2 OF 3</span>
+              <h2>Education &amp; Career Details</h2>
+              <p>Share a few details about your education, work and lifestyle.</p>
+            </div>
 
             {/* Education Level */}
-            <div className="form-group">
-              <label>Education Level</label>
+            <div className="rd1-field">
+              <label htmlFor="educationLevel">Education Level</label>
 
               <select
+                id="educationLevel"
                 name="educationLevel"
                 value={formData.educationLevel}
                 onChange={handleChange}
@@ -143,11 +149,12 @@ export default function RegistrationDetails1() {
             </div>
 
             {/* Education */}
-            <div className="form-group">
-              <label>Education *</label>
+            <div className="rd1-field">
+              <label htmlFor="education">Education <span>*</span></label>
 
               <input
                 type="text"
+                id="education"
                 name="education"
                 placeholder="Enter Education"
                 value={formData.education}
@@ -157,11 +164,12 @@ export default function RegistrationDetails1() {
             </div>
 
             {/* Highest Education */}
-            <div className="form-group">
-              <label>Highest Education *</label>
+            <div className="rd1-field">
+              <label htmlFor="highestEducation">Highest Education <span>*</span></label>
 
               <input
                 type="text"
+                id="highestEducation"
                 name="highestEducation"
                 placeholder="Enter Highest Education"
                 value={formData.highestEducation}
@@ -171,10 +179,11 @@ export default function RegistrationDetails1() {
             </div>
 
             {/* Occupation Level */}
-            <div className="form-group">
-              <label>Occupation Level *</label>
+            <div className="rd1-field">
+              <label htmlFor="occupationLevel">Occupation Level <span>*</span></label>
 
               <select
+                id="occupationLevel"
                 name="occupationLevel"
                 value={formData.occupationLevel}
                 onChange={handleChange}
@@ -192,11 +201,12 @@ export default function RegistrationDetails1() {
             </div>
 
             {/* Occupation */}
-            <div className="form-group">
-              <label>Occupation *</label>
+            <div className="rd1-field">
+              <label htmlFor="occupation">Occupation <span>*</span></label>
 
               <input
                 type="text"
+                id="occupation"
                 name="occupation"
                 placeholder="Enter Occupation"
                 value={formData.occupation}
@@ -206,11 +216,12 @@ export default function RegistrationDetails1() {
             </div>
 
             {/* Annual Income */}
-            <div className="form-group">
-              <label>Annual Income *</label>
+            <div className="rd1-field">
+              <label htmlFor="annualIncome">Annual Income <span>*</span></label>
 
               <input
                 type="text"
+                id="annualIncome"
                 name="annualIncome"
                 placeholder="Enter Annual Income"
                 value={formData.annualIncome}
@@ -220,10 +231,11 @@ export default function RegistrationDetails1() {
             </div>
 
             {/* Work Location */}
-            <div className="form-group">
-              <label>Work Location *</label>
+            <div className="rd1-field">
+              <label htmlFor="workLocation">Work Location <span>*</span></label>
 
               <select
+                id="workLocation"
                 name="workLocation"
                 value={formData.workLocation}
                 onChange={handleChange}
@@ -242,11 +254,12 @@ export default function RegistrationDetails1() {
             </div>
 
             {/* Working Place */}
-            <div className="form-group">
-              <label>Working Place *</label>
+            <div className="rd1-field">
+              <label htmlFor="workingPlace">Working Place <span>*</span></label>
 
               <input
                 type="text"
+                id="workingPlace"
                 name="workingPlace"
                 placeholder="Enter Working Place"
                 value={formData.workingPlace}
@@ -256,11 +269,12 @@ export default function RegistrationDetails1() {
             </div>
 
             {/* Height */}
-            <div className="form-group">
-              <label>Height *</label>
+            <div className="rd1-field">
+              <label htmlFor="height">Height <span>*</span></label>
 
               <input
                 type="text"
+                id="height"
                 name="height"
                 placeholder="Example: 5'5&quot;"
                 value={formData.height}
@@ -270,10 +284,11 @@ export default function RegistrationDetails1() {
             </div>
 
             {/* Disability */}
-            <div className="form-group">
-              <label>Any Disability</label>
+            <div className="rd1-field">
+              <label htmlFor="disability">Any Disability</label>
 
               <select
+                id="disability"
                 name="disability"
                 value={formData.disability}
                 onChange={handleChange}
@@ -284,10 +299,10 @@ export default function RegistrationDetails1() {
             </div>
 
             {/* Buttons */}
-            <div className="form-buttons">
+            <div className="rd1-actions">
               <button
                 type="button"
-                className="back-btn"
+                className="rd1-back-btn"
                 onClick={() =>
                   navigate("/registration", {
                     state: {
@@ -300,7 +315,7 @@ export default function RegistrationDetails1() {
                 BACK
               </button>
 
-              <button type="submit" className="submit-btn">
+              <button type="submit" className="rd1-next-btn">
                 NEXT
               </button>
             </div>

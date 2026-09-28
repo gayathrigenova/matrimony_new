@@ -1,3 +1,4 @@
+import { API_URL } from "../api.js";
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Login.css";
@@ -16,7 +17,7 @@ export default function Login() {
 
     try {
       const response = await fetch(
-        "http://127.0.0.1:8000/api/accounts/login/",
+        `${API_URL}/accounts/login/`,
         {
           method: "POST",
           headers: {

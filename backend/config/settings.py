@@ -21,6 +21,7 @@ SECRET_KEY = os.getenv(
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 
 ALLOWED_HOSTS = [
+    "matrimonynew-production.up.railway.app",
     "matrimonydjango.onrender.com",
     "localhost",
     "127.0.0.1",
@@ -208,6 +209,8 @@ REST_FRAMEWORK = {
 
 CORS_ALLOWED_ORIGINS = [
     "https://matrimony-sepia-phi.vercel.app",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
 ]
 
 

@@ -231,14 +231,12 @@ REST_FRAMEWORK = {
 # =========================================================
 
 CORS_ALLOWED_ORIGINS = [
-    origin.strip()
-    for origin in os.getenv(
-        "CORS_ALLOWED_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173,https://matrimony-sepia-phi.vercel.app",
-    ).split(",")
-    if origin.strip()
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://matrimony-sepia-phi.vercel.app",
 ]
 
+CORS_ALLOW_CREDENTIALS = True
 # WhiteNoise is installed by the deployment requirements. Keep local startup
 # usable before optional production dependencies have been installed.
 if HAS_WHITENOISE:
@@ -250,12 +248,10 @@ if HAS_WHITENOISE:
 # =========================================================
 
 CSRF_TRUSTED_ORIGINS = [
-    origin.strip()
-    for origin in os.getenv(
-        "CSRF_TRUSTED_ORIGINS",
-        "https://matrimony-sepia-phi.vercel.app,https://matrimonydjango.onrender.com",
-    ).split(",")
-    if origin.strip()
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://matrimony-sepia-phi.vercel.app",
+    "https://matrimonynew-production.up.railway.app",
 ]
 
 # Railway terminates TLS at its proxy. Enforce HTTPS and secure cookies only

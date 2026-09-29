@@ -1,0 +1,112 @@
+/* Admin Login Page */
+
+.admin-login-page {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 30px 20px;
+  background: linear-gradient(135deg, #f5fff9, #ffffff);
+}
+
+/* Login Card */
+
+.admin-login-card {
+  width: 100%;
+  max-width: 430px;
+  background: #ffffff;
+  padding: 40px 35px;
+  border-radius: 18px;
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.12);
+  border: 1px solid #e8e8e8;
+}
+
+/* Heading */
+
+.admin-login-card h1 {
+  margin: 0;
+  text-align: center;
+  color: #00ab5b;
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.admin-login-card > p {
+  text-align: center;
+  color: #777;
+  margin: 8px 0 30px;
+  font-size: 15px;
+}
+
+/* Form */
+
+.admin-login-card .form-group {
+  margin-bottom: 20px;
+}
+
+.admin-login-card label {
+  display: block;
+  margin-bottom: 8px;
+  color: #333;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.admin-login-card input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 13px 14px;
+  border: 1px solid #d8d8d8;
+  border-radius: 8px;
+  outline: none;
+  font-size: 15px;
+  transition: 0.3s;
+}
+
+.admin-login-card input:focus {
+  border-color: #00ab5b;
+  box-shadow: 0 0 0 3px rgba(0, 171, 91, 0.1);
+}
+
+/* Login Button */
+
+.admin-login-btn {
+  width: 100%;
+  border: none;
+  padding: 14px;
+  margin-top: 8px;
+  border-radius: 8px;
+  background: #00ab5b;
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.admin-login-btn:hover {
+  background: #008f4c;
+  transform: translateY(-1px);
+}
+
+.admin-login-btn:disabled {
+  background: #9bcdb5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Mobile */
+
+@media (max-width: 500px) {
+  .admin-login-page {
+    padding: 20px 15px;
+  }
+
+  .admin-login-card {
+    padding: 30px 22px;
+  }
+
+  .admin-login-card h1 {
+    font-size: 26px;
+  }
+}

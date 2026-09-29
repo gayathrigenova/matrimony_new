@@ -1,0 +1,66 @@
+.nf-page {
+  min-height: 80vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8f9fa;
+  padding: 2rem;
+  text-align: center;
+}
+
+.nf-content {
+  max-width: 480px;
+}
+
+.nf-code {
+  font-size: 8rem;
+  font-weight: 800;
+  line-height: 1;
+  background: linear-gradient(135deg, #16482b, #8b0045);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 1rem;
+}
+
+.nf-content h1 {
+  font-size: 1.8rem;
+  color: #222;
+  margin-bottom: 0.8rem;
+}
+
+.nf-content p {
+  color: #888;
+  font-size: 1rem;
+  margin-bottom: 2rem;
+  line-height: 1.6;
+}
+
+.nf-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.nf-actions button {
+  padding: 0.75rem 2rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  background: linear-gradient(135deg, #6b0030, #8b0045);
+  color: #fff;
+  border: none;
+}
+
+.nf-actions button:hover { opacity: 0.9; transform: translateY(-2px); }
+
+.nf-outline {
+  background: transparent !important;
+  border: 2px solid #8b0045 !important;
+  color: #8b0045 !important;
+}
+
+.nf-outline:hover { background: #8b0045 !important; color: #fff !important; }

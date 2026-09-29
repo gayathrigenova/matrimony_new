@@ -1,0 +1,9 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "packages": {
+    "apt": [
+      "pkg-config",
+      "default-libmysqlclient-dev"
+    ]
+  }
+}

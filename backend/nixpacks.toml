@@ -4,8 +4,3 @@ aptPkgs = [
   "default-libmysqlclient-dev",
   "build-essential"
 ]
-
-[phases.install]
-cmds = [
-  "pip install -r requirements.txt"
-]

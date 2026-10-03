@@ -225,16 +225,15 @@ CORS_ALLOWED_ORIGINS = [
     "https://matrimony-sepia-phi.vercel.app",
 ]
 
-
 # =========================================================
 # CSRF
 # =========================================================
 
 CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
     "https://matrimony-sepia-phi.vercel.app",
-    "https://matrimonydjango.onrender.com",
 ]
-
 
 # =========================================================
 # EMAIL

@@ -105,16 +105,30 @@ TEMPLATES = [
 # DATABASE
 # =========================================================
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.mysql",
-        "NAME": os.getenv("DB_NAME", "matrimony_db"),
-        "USER": os.getenv("DB_USER", "root"),
-        "PASSWORD": os.getenv("DB_PASSWORD", ""),
-        "HOST": os.getenv("DB_HOST", "localhost"),
-        "PORT": os.getenv("DB_PORT", "3306"),
+DB_HOST = os.getenv("DB_HOST") or os.getenv("MYSQLHOST")
+
+if DB_HOST:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.mysql",
+            "NAME": os.getenv("DB_NAME") or os.getenv("MYSQLDATABASE", "matrimony_db"),
+            "USER": os.getenv("DB_USER") or os.getenv("MYSQLUSER", "root"),
+            "PASSWORD": os.getenv("DB_PASSWORD") or os.getenv("MYSQLPASSWORD", ""),
+            "HOST": DB_HOST,
+            "PORT": os.getenv("DB_PORT") or os.getenv("MYSQLPORT", "3306"),
+        }
     }
-}
+elif os.getenv("RAILWAY_ENVIRONMENT"):
+    raise RuntimeError(
+        "Set MYSQLHOST and the Railway MySQL credentials for deployment."
+    )
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 
 # =========================================================

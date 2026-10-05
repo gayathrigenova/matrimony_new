@@ -1,11 +1,6 @@
 import os
 from pathlib import Path
 
-
-# =========================================================
-# BASE DIRECTORY
-# =========================================================
-
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -15,24 +10,22 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv(
     "DJANGO_SECRET_KEY",
-    "django-insecure-change-this-for-production"
+    "django-insecure-local-development-only"
 )
 
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 
 ALLOWED_HOSTS = [
-    "matrimonydjango.onrender.com",
+    "matrimonynew-production.up.railway.app",
     "localhost",
     "127.0.0.1",
 ]
-
 
 # =========================================================
 # APPLICATIONS
 # =========================================================
 
 INSTALLED_APPS = [
-    # Django
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -40,11 +33,9 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
 
-    # Third-party
     "rest_framework",
     "corsheaders",
 
-    # Project apps
     "accounts",
     "registrations",
     "profiles",
@@ -71,10 +62,6 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-
-# =========================================================
-# URL / WSGI
-# =========================================================
 
 ROOT_URLCONF = "config.urls"
 
@@ -111,17 +98,31 @@ if DB_HOST:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.mysql",
-            "NAME": os.getenv("DB_NAME") or os.getenv("MYSQLDATABASE", "matrimony_db"),
-            "USER": os.getenv("DB_USER") or os.getenv("MYSQLUSER", "root"),
-            "PASSWORD": os.getenv("DB_PASSWORD") or os.getenv("MYSQLPASSWORD", ""),
+            "NAME": os.getenv(
+                "DB_NAME",
+                os.getenv("MYSQLDATABASE", "matrimony_db")
+            ),
+            "USER": os.getenv(
+                "DB_USER",
+                os.getenv("MYSQLUSER", "root")
+            ),
+            "PASSWORD": os.getenv(
+                "DB_PASSWORD",
+                os.getenv("MYSQLPASSWORD", "")
+            ),
             "HOST": DB_HOST,
-            "PORT": os.getenv("DB_PORT") or os.getenv("MYSQLPORT", "3306"),
+            "PORT": os.getenv(
+                "DB_PORT",
+                os.getenv("MYSQLPORT", "3306")
+            ),
         }
     }
+
 elif os.getenv("RAILWAY_ENVIRONMENT"):
     raise RuntimeError(
         "Set MYSQLHOST and the Railway MySQL credentials for deployment."
     )
+
 else:
     DATABASES = {
         "default": {
@@ -132,7 +133,7 @@ else:
 
 
 # =========================================================
-# CUSTOM USER MODEL
+# CUSTOM USER
 # =========================================================
 
 AUTH_USER_MODEL = "accounts.User"
@@ -175,41 +176,55 @@ AUTH_PASSWORD_VALIDATORS = [
 # =========================================================
 
 LANGUAGE_CODE = "en-us"
-
 TIME_ZONE = "UTC"
-
 USE_I18N = True
-
 USE_TZ = True
 
 
 # =========================================================
-# STATIC FILES
+# STATIC
 # =========================================================
 
 STATIC_URL = "/static/"
-
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+try:
+    import whitenoise  # noqa: F401
+except ImportError:
+    STATICFILES_BACKEND = (
+        "django.contrib.staticfiles.storage.StaticFilesStorage"
+    )
+else:
+    STATICFILES_BACKEND = (
+        "whitenoise.storage.CompressedManifestStaticFilesStorage"
+    )
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage"
+    },
+    "staticfiles": {
+        "BACKEND": STATICFILES_BACKEND
+    },
+}
 
 
 # =========================================================
-# MEDIA FILES
+# MEDIA
 # =========================================================
 
 MEDIA_URL = "/media/"
-
 MEDIA_ROOT = BASE_DIR / "media"
 
 
 # =========================================================
-# DJANGO REST FRAMEWORK
+# DRF
 # =========================================================
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
-
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
@@ -219,11 +234,33 @@ REST_FRAMEWORK = {
 # =========================================================
 # CORS
 # =========================================================
+
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "https://matrimony-sepia-phi.vercel.app",
 ]
+
+CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOW_METHODS = [
+    "DELETE",
+    "GET",
+    "OPTIONS",
+    "PATCH",
+    "POST",
+    "PUT",
+]
+
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "authorization",
+    "content-type",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+]
+
 
 # =========================================================
 # CSRF
@@ -233,7 +270,25 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "https://matrimony-sepia-phi.vercel.app",
+    "https://matrimonynew-production.up.railway.app",
 ]
+
+# =========================================================
+# RAILWAY HTTPS
+# =========================================================
+
+SECURE_PROXY_SSL_HEADER = (
+    "HTTP_X_FORWARDED_PROTO",
+    "https",
+)
+
+IS_RAILWAY = bool(os.getenv("RAILWAY_ENVIRONMENT"))
+
+if IS_RAILWAY:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
 
 # =========================================================
 # EMAIL
@@ -241,9 +296,5 @@ CSRF_TRUSTED_ORIGINS = [
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
-
-# =========================================================
-# DEFAULT PRIMARY KEY
-# =========================================================
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

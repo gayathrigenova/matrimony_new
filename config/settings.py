@@ -16,12 +16,9 @@ SECRET_KEY = os.getenv(
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 
 ALLOWED_HOSTS = [
-    host.strip()
-    for host in os.getenv(
-        "DJANGO_ALLOWED_HOSTS",
-        "matrimonynew-production.up.railway.app,localhost,127.0.0.1",
-    ).split(",")
-    if host.strip()
+    "matrimonynew-production.up.railway.app",
+    "localhost",
+    "127.0.0.1",
 ]
 
 
@@ -276,7 +273,6 @@ CSRF_TRUSTED_ORIGINS = [
     "https://matrimony-sepia-phi.vercel.app",
     "https://matrimonynew-production.up.railway.app",
 ]
-
 
 # =========================================================
 # RAILWAY HTTPS

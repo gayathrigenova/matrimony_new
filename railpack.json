@@ -1,0 +1,11 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "packages": {
+    "node": "20.19.0"
+  },
+  "buildAptPackages": [
+    "pkg-config",
+    "default-libmysqlclient-dev",
+    "build-essential"
+  ]
+}

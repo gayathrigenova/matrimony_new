@@ -1,0 +1,21 @@
+providers = ["node", "python"]
+
+[variables]
+NIXPACKS_NODE_VERSION = "22"
+NIXPACKS_PYTHON_VERSION = "3.12"
+
+[phases.setup]
+aptPkgs = [
+  "pkg-config",
+  "default-libmysqlclient-dev",
+  "build-essential"
+]
+
+[phases.build]
+cmds = [
+  "npm run build",
+  "python manage.py collectstatic --noinput"
+]
+
+[start]
+cmd = "python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT"

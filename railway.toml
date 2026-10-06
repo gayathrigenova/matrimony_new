@@ -1,6 +1,5 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "npm run build && python manage.py collectstatic --noinput"
 
 [deploy]
 startCommand = "python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT"

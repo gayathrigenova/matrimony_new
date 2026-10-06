@@ -1,4 +1,4 @@
-providers = ["node", "python"]
+providers = ["python"]
 
 [variables]
 NIXPACKS_NODE_VERSION = "20"

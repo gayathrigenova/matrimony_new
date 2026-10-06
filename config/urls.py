@@ -1,32 +1,46 @@
-"""
-URL configuration for config project.
+from pathlib import Path
 
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/6.1/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
 from django.contrib import admin
-from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from django.http import JsonResponse
+from django.http import FileResponse, JsonResponse
+from django.urls import include, path, re_path
+from django.views.static import serve
+
+
+FRONTEND_DIR = Path(settings.BASE_DIR) / "dist"
 
 
 def health_check(request):
-    return JsonResponse({"status": "ok", "service": "matrimony-api"})
+    return JsonResponse({
+        "status": "ok",
+        "service": "matrimony-api"
+    })
+
+
+def frontend(request):
+    index_file = FRONTEND_DIR / "index.html"
+
+    if not index_file.exists():
+        return JsonResponse(
+            {
+                "status": "error",
+                "detail": "React build not found"
+            },
+            status=503
+        )
+
+    return FileResponse(
+        index_file.open("rb"),
+        content_type="text/html"
+    )
 
 
 urlpatterns = [
-    path("", health_check, name="health-check"),
+    # Health check
+    path("health/", health_check, name="health-check"),
+
+    # Django admin
     path("admin/", admin.site.urls),
 
     # Registration API
@@ -45,6 +59,37 @@ urlpatterns = [
     path(
         "api/adminpanel/",
         include("adminpanel.urls")
+    ),
+
+    # React Vite assets
+    path(
+        "assets/<path:path>",
+        serve,
+        {
+            "document_root": FRONTEND_DIR / "assets"
+        }
+    ),
+
+    # React root files
+    re_path(
+        r"^(?P<path>favicon\.svg|icons\.svg)$",
+        serve,
+        {
+            "document_root": FRONTEND_DIR
+        }
+    ),
+
+    # React homepage
+    path(
+        "",
+        frontend,
+        name="frontend"
+    ),
+
+    # React Router pages
+    re_path(
+        r"^(?!api/|admin/|assets/|static/|media/|health/).*$",
+        frontend
     ),
 ]
 

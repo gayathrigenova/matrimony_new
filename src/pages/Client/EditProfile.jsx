@@ -10,6 +10,10 @@ export default function EditProfile() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
+  const [profilePhotoFailed, setProfilePhotoFailed] = useState(false);
+  const [profilePhotoPreview, setProfilePhotoPreview] = useState("");
+  const [review, setReview] = useState({ status: "PENDING", correction: "", rejection: "", profilePhoto: "", identityDocument: "", additionalDocument: "" });
+  const [uploads, setUploads] = useState({ profile_photo: null, identity_document: null, additional_document: null });
 
   const [formData, setFormData] = useState({
     full_name: "",
@@ -62,6 +66,19 @@ export default function EditProfile() {
   const token = localStorage.getItem("access_token");
 
   useEffect(() => {
+    if (!uploads.profile_photo) {
+      setProfilePhotoPreview("");
+      return undefined;
+    }
+
+    const previewUrl = URL.createObjectURL(uploads.profile_photo);
+    setProfilePhotoPreview(previewUrl);
+    setProfilePhotoFailed(false);
+
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [uploads.profile_photo]);
+
+  useEffect(() => {
     if (!token) {
       navigate("/login");
       return;
@@ -74,17 +91,34 @@ export default function EditProfile() {
       },
     })
       .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           if (res.status === 401) {
             localStorage.clear();
             navigate("/login");
             return;
           }
-          throw new Error("Failed to fetch profile");
+          if (res.status === 404) {
+            setMessage({
+              type: "info",
+              text: "No saved profile was found. Complete these details and click Save Changes to create your profile for this account.",
+            });
+            return null;
+          }
+          throw new Error(data.detail || "Failed to fetch profile");
         }
-        return res.json();
+        return data;
       })
       .then((data) => {
+        if (!data) return;
+        setReview({
+          status: data.status || "PENDING",
+          correction: data.correction_reason || "",
+          rejection: data.rejection_reason || "",
+          profilePhoto: data.profile_photo_url || "",
+          identityDocument: data.identity_document_url || "",
+          additionalDocument: data.additional_document_url || "",
+        });
         setFormData({
           full_name: data.full_name || "",
           gender: data.gender || "",
@@ -146,38 +180,36 @@ export default function EditProfile() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
     setMessage({ type: "", text: "" });
 
-    fetch(`${API_URL}/registrations/my-profile/`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(formData),
-    })
-      .then(async (res) => {
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data.detail || "Failed to update profile.");
-        }
-        setMessage({
-          type: "success",
-          text: "Profile updated successfully.",
-        });
-        setTimeout(() => {
-          navigate("/profile");
-        }, 1500);
-      })
-      .catch((err) => {
-        setMessage({ type: "error", text: err.message || "Failed to update profile." });
-      })
-      .finally(() => {
-        setSaving(false);
+    const payload = new FormData();
+    Object.entries(formData).forEach(([key, value]) => payload.append(key, value));
+    Object.entries(uploads).forEach(([key, file]) => { if (file) payload.append(key, file); });
+    try {
+      const response = await fetchWithTokenRefresh(`${API_URL}/registrations/my-profile/`, {
+        method: "PATCH",
+        headers: {},
+        body: payload,
       });
+      const result = await readApiResponse(response);
+      if (result?.nonJsonResponse) {
+        throw new Error(getApiErrorMessage(result, response.status));
+      }
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("Your login session has expired. Please sign in again, then upload the image once more.");
+        }
+        throw new Error(getApiErrorMessage(result, response.status));
+      }
+      navigate("/profile?view=1", { state: { success: "Profile and uploads saved successfully." } });
+    } catch (err) {
+      setMessage({ type: "error", text: err.message || "Failed to update profile." });
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) {
@@ -199,13 +231,19 @@ export default function EditProfile() {
             <h1>Edit Profile</h1>
             <p>Update your personal, educational, family and contact information.</p>
           </div>
-          <button className="btn-cancel" onClick={() => navigate("/profile")}>
+          <button className="btn-cancel" type="button" onClick={() => navigate("/profile?view=1")}>
             View Profile
           </button>
         </div>
 
         <div className="workflow-notice">
           ℹ️ <strong>Admin Verification Rule:</strong> If your profile is already published, modifying major details will place your profile under admin review for verification before changes are published.
+        </div>
+
+        <div className="workflow-notice" role="status">
+          Verification status: <strong>{review.status.replaceAll("_", " ")}</strong>
+          {review.correction && <p>Correction requested: {review.correction}</p>}
+          {review.rejection && <p>Admin decision: {review.rejection}</p>}
         </div>
 
         {message.text && (
@@ -215,6 +253,32 @@ export default function EditProfile() {
         )}
 
         <form onSubmit={handleSubmit}>
+          <div className="edit-form-card">
+            <h3 className="edit-form-title">Profile photo and documents</h3>
+            <div className="profile-upload-preview">
+              {(profilePhotoPreview || review.profilePhoto) && !profilePhotoFailed ? (
+                <img
+                  src={profilePhotoPreview || review.profilePhoto}
+                  alt={profilePhotoPreview ? "Selected profile photo preview" : "Current profile photo"}
+                  onError={() => setProfilePhotoFailed(true)}
+                />
+              ) : (
+                <div className="edit-profile-photo-placeholder" aria-label="No profile photo">
+                  {formData.full_name?.charAt(0)?.toUpperCase() || "U"}
+                </div>
+              )}
+            </div>
+            <div className="form-grid">
+              <FileField label="Profile photo" name="profile_photo" accept="image/*" uploads={uploads} setUploads={setUploads} />
+              <FileField label="Identity document" name="identity_document" accept=".pdf,image/*" uploads={uploads} setUploads={setUploads} />
+              <FileField label="Additional document" name="additional_document" accept=".pdf,image/*" uploads={uploads} setUploads={setUploads} />
+            </div>
+            <div className="details-grid">
+              {review.identityDocument && <p>Identity document saved: <a href={review.identityDocument} target="_blank" rel="noreferrer">View document</a></p>}
+              {review.additionalDocument && <p>Additional document saved: <a href={review.additionalDocument} target="_blank" rel="noreferrer">View document</a></p>}
+            </div>
+            <p>Manage multiple profile photos from <button type="button" className="btn-cancel" onClick={() => navigate("/photos")}>My Photos</button>.</p>
+          </div>
           {/* PERSONAL INFORMATION */}
           <div className="edit-form-card">
             <h3 className="edit-form-title">👤 Personal Details</h3>
@@ -479,13 +543,76 @@ export default function EditProfile() {
               >
                 Cancel
               </button>
-              <button type="submit" className="btn-save" disabled={saving}>
-                {saving ? "Saving Changes..." : "Save Changes"}
+              <button type="submit" className="btn-save" disabled={saving} aria-busy={saving}>
+                {saving ? (uploads.profile_photo ? "Uploading image and saving..." : "Saving Changes...") : "Save Changes"}
               </button>
             </div>
           </div>
         </form>
       </div>
     </ClientLayout>
+  );
+}
+
+async function readApiResponse(response) {
+  const responseText = await response.text();
+  if (!responseText) return null;
+
+  try {
+    return JSON.parse(responseText);
+  } catch {
+    return { nonJsonResponse: true };
+  }
+}
+
+async function fetchWithTokenRefresh(url, options) {
+  const accessToken = localStorage.getItem("access_token");
+  const sendRequest = (token) => fetch(url, {
+    ...options,
+    headers: {
+      ...options.headers,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  let response = await sendRequest(accessToken);
+  if (response.status !== 401) return response;
+
+  const refreshToken = localStorage.getItem("refresh_token");
+  if (!refreshToken) return response;
+
+  const refreshResponse = await fetch(`${API_URL}/accounts/token/refresh/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh: refreshToken }),
+  });
+  const refreshed = await readApiResponse(refreshResponse);
+  if (!refreshResponse.ok || !refreshed?.access) {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    return response;
+  }
+
+  localStorage.setItem("access_token", refreshed.access);
+  return sendRequest(refreshed.access);
+}
+
+function getApiErrorMessage(result, status) {
+  if (result?.detail) return result.detail;
+  if (result?.message) return result.message;
+  if (result?.nonJsonResponse) {
+    if (status === 413) return "The uploaded file is too large. Choose a smaller image or document and try again.";
+    return `The server returned an unexpected response (HTTP ${status}). Your changes may not have been saved; please try again.`;
+  }
+  return "Failed to update profile.";
+}
+
+function FileField({ label, name, accept, uploads, setUploads }) {
+  return (
+    <div className="form-group">
+      <label htmlFor={name}>{label}</label>
+      <input id={name} type="file" accept={accept} onChange={(event) => setUploads((current) => ({ ...current, [name]: event.target.files?.[0] || null }))} />
+      {uploads[name] && <small>{uploads[name].name}</small>}
+    </div>
   );
 }

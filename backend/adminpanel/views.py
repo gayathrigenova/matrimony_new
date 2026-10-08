@@ -1,4 +1,5 @@
 from django.utils import timezone
+from django.db.models import OuterRef, Subquery
 
 from rest_framework import status
 from rest_framework.response import Response
@@ -19,28 +20,42 @@ class AdminRegistrationListView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
 
     def get(self, request):
-        registrations = Registration.objects.select_related("user").all()
+        latest_registration = Registration.objects.filter(
+            user_id=OuterRef("user_id")
+        ).order_by("-created_at", "-id").values("id")[:1]
+        registrations = Registration.objects.filter(
+            id=Subquery(latest_registration)
+        ).select_related("user")
 
         data = []
 
         for registration in registrations:
+            verification_status = {
+                Registration.Status.PENDING: ProfileVerification.Status.PENDING,
+                Registration.Status.UNDER_REVIEW: ProfileVerification.Status.UNDER_REVIEW,
+                Registration.Status.CORRECTION_REQUIRED: ProfileVerification.Status.CORRECTION_REQUIRED,
+                Registration.Status.APPROVED: ProfileVerification.Status.APPROVED,
+                Registration.Status.PUBLISHED: ProfileVerification.Status.APPROVED,
+                Registration.Status.REJECTED: ProfileVerification.Status.REJECTED,
+            }.get(registration.status, ProfileVerification.Status.PENDING)
             verification, created = ProfileVerification.objects.get_or_create(
                 client=registration.user,
                 defaults={
-                    "status": (
-                        ProfileVerification.Status.APPROVED
-                        if registration.status == Registration.Status.APPROVED
-                        else ProfileVerification.Status.PENDING
-                    )
+                    "status": verification_status,
                 },
             )
+
+            if verification.status != verification_status:
+                verification.status = verification_status
+                verification.save(update_fields=["status", "updated_at"])
 
             data.append({
                 "verification": ProfileVerificationSerializer(
                     verification
                 ).data,
                 "registration": RegistrationCheckingSerializer(
-                    registration
+                    registration,
+                    context={"request": request},
                 ).data,
             })
 
@@ -70,7 +85,8 @@ class AdminRegistrationDetailView(APIView):
                 verification
             ).data,
             "registration": RegistrationCheckingSerializer(
-                registration
+                registration,
+                context={"request": request},
             ).data,
         })
 

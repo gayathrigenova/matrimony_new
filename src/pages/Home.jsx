@@ -167,7 +167,9 @@ export default function Home() {
 
               <div className="hero-form-footer">
                 <span>🎧 Support</span>
-                <span>💬 Chat for assistance</span>
+                <a href="https://wa.me/917559080005" target="_blank" rel="noreferrer">
+                  💬 Chat for assistance
+                </a>
               </div>
             </form>
           </div>

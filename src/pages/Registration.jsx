@@ -8,18 +8,19 @@ export default function Registration() {
   const location = useLocation();
 
   const prefill = location.state || {};
+  const previousFormData = prefill.step1FormData || {};
 
   const [formData, setFormData] = useState({
-    name: prefill.name || "",
-    gender: prefill.gender || "",
-    date_of_birth: "",
-    maritalStatus: "",
-    caste: "",
-    phone: prefill.phone || "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-    source: "",
+    name: previousFormData.name || prefill.name || prefill.registration?.full_name || "",
+    gender: previousFormData.gender || prefill.gender || prefill.registration?.gender || "",
+    date_of_birth: previousFormData.date_of_birth || "",
+    maritalStatus: previousFormData.maritalStatus || "",
+    caste: previousFormData.caste || "",
+    phone: previousFormData.phone || prefill.phone || prefill.registration?.phone || "",
+    email: previousFormData.email || prefill.registration?.email || "",
+    password: previousFormData.password || prefill.registration?.password || "",
+    confirmPassword: previousFormData.confirmPassword || prefill.registration?.password || "",
+    source: previousFormData.source || "",
   });
   const [fieldErrors, setFieldErrors] = useState({});
   const [checkingEmail, setCheckingEmail] = useState(false);
@@ -94,6 +95,7 @@ export default function Registration() {
     navigate("/registration-details", {
       state: {
         registration: registrationData,
+        step1FormData: formData,
       },
     });
   };
@@ -372,20 +374,6 @@ export default function Registration() {
 
             </div>
 
-            <div className="registration-form-group">
-              <label>Confirm Password *</label>
-              <input
-                type="password"
-                name="confirmPassword"
-                placeholder="Re-enter Password"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                required
-              />
-              {fieldErrors.confirmPassword && <small className="registration-field-error" role="alert">{fieldErrors.confirmPassword}</small>}
-
-            </div>
-
             {/* PASSWORD */}
             <div className="registration-form-group">
 
@@ -402,6 +390,19 @@ export default function Registration() {
                 required
               />
 
+            </div>
+
+            <div className="registration-form-group">
+              <label>Confirm Password *</label>
+              <input
+                type="password"
+                name="confirmPassword"
+                placeholder="Re-enter Password"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                required
+              />
+              {fieldErrors.confirmPassword && <small className="registration-field-error" role="alert">{fieldErrors.confirmPassword}</small>}
             </div>
 
             {/* =========================

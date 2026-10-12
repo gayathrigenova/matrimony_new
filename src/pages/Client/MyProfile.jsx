@@ -30,6 +30,7 @@ export default function MyProfile() {
         if (!res.ok) {
           if (res.status === 401) {
             localStorage.clear();
+            window.dispatchEvent(new Event("auth-change"));
             navigate("/login");
             return;
           }

@@ -1,5 +1,5 @@
 import React from "react";
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
@@ -60,7 +60,7 @@ function AppLayout() {
   // Admin pages have their own layout
   const isAdminPage = location.pathname.startsWith("/admin");
 
-  const hideMainNavbar = isClientDashboard || isAdminPage;
+  const hideMainNavbar = isAdminPage;
   const hideFooter = isClientDashboard || isAdminPage;
 
   return (
@@ -101,16 +101,16 @@ function AppLayout() {
               CLIENT
           ========================= */}
 
-          <Route path="/dashboard" element={<ClientDashboard />} />
-          <Route path="/profile" element={<MyProfile />} />
-          <Route path="/profile/edit" element={<EditProfile />} />
-          <Route path="/search-matches" element={<SearchMatches />} />
-          <Route path="/search-matches/:id" element={<ClientProfileDetails />} />
-          <Route path="/interests" element={<Interests />} />
-          <Route path="/shortlist" element={<Shortlist />} />
-          <Route path="/messages" element={<Messages />} />
-          <Route path="/photos" element={<MyPhotos />} />
-          <Route path="/settings" element={<Settings />} />
+          <Route path="/dashboard" element={<ClientOnlyRoute><ClientDashboard /></ClientOnlyRoute>} />
+          <Route path="/profile" element={<ClientOnlyRoute><MyProfile /></ClientOnlyRoute>} />
+          <Route path="/profile/edit" element={<ClientOnlyRoute><EditProfile /></ClientOnlyRoute>} />
+          <Route path="/search-matches" element={<ClientOnlyRoute><SearchMatches /></ClientOnlyRoute>} />
+          <Route path="/search-matches/:id" element={<ClientOnlyRoute><ClientProfileDetails /></ClientOnlyRoute>} />
+          <Route path="/interests" element={<ClientOnlyRoute><Interests /></ClientOnlyRoute>} />
+          <Route path="/shortlist" element={<ClientOnlyRoute><Shortlist /></ClientOnlyRoute>} />
+          <Route path="/messages" element={<ClientOnlyRoute><Messages /></ClientOnlyRoute>} />
+          <Route path="/photos" element={<ClientOnlyRoute><MyPhotos /></ClientOnlyRoute>} />
+          <Route path="/settings" element={<ClientOnlyRoute><Settings /></ClientOnlyRoute>} />
 
           {/* =========================
               404 (MUST BE LAST)
@@ -126,6 +126,24 @@ function AppLayout() {
 
     </div>
   );
+}
+
+function ClientOnlyRoute({ children }) {
+  if (!localStorage.getItem("access_token")) {
+    return <Navigate to="/login" replace />;
+  }
+
+  let role;
+  try {
+    role = JSON.parse(localStorage.getItem("user") || "null")?.role;
+  } catch {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (role === "CLIENT") return children;
+  if (role === "ADMIN") return <Navigate to="/admin/dashboard" replace />;
+  if (role === "BROKER") return <Navigate to="/broker/dashboard" replace />;
+  return <Navigate to="/login" replace />;
 }
 
 

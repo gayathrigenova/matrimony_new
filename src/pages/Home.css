@@ -241,6 +241,17 @@
   cursor: pointer;
 }
 
+.hero-form-footer a {
+  color: inherit;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.hero-form-footer a:hover {
+  color: #008244;
+  text-decoration: underline;
+}
+
 /* Standard Section Layouts */
 .section-container {
   max-width: 1400px;

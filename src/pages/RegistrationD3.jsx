@@ -10,7 +10,7 @@ export default function RegistrationStep3() {
   // Step 1 + Step 2 data
   const registration = location.state?.registration || null;
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(() => ({
     // Family Details
     fatherName: "",
     fatherOccupation: "",
@@ -40,7 +40,8 @@ export default function RegistrationStep3() {
 
     // Terms
     acceptTerms: false,
-  });
+    ...location.state?.step3FormData,
+  }));
 
   // =========================
   // HANDLE INPUT CHANGE
@@ -719,12 +720,25 @@ export default function RegistrationStep3() {
             {/* =================================
                 REGISTER BUTTON
             ================================== */}
-            <button
-              type="submit"
-              className="reg3-register-btn"
-            >
-              REGISTER NOW
-            </button>
+            <div className="reg3-actions">
+              <button
+                type="button"
+                className="reg3-back-btn"
+                onClick={() => navigate("/registration-details", {
+                  state: {
+                    registration,
+                    step1FormData: location.state?.step1FormData,
+                    step2FormData: location.state?.step2FormData,
+                    step3FormData: formData,
+                  },
+                })}
+              >
+                BACK
+              </button>
+              <button type="submit" className="reg3-register-btn">
+                REGISTER NOW
+              </button>
+            </div>
 
           </form>
         </div>

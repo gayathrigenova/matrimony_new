@@ -65,3 +65,4 @@ class RegistrationDuplicateValidationTests(TestCase):
         self.assertEqual(response.status_code, 201, response.data)
         self.assertTrue(User.objects.filter(email="new.user@example.com").exists())
         self.assertTrue(Registration.objects.filter(phone="9123456780").exists())
+

@@ -1,5 +1,5 @@
-import { API_URL } from "../api.js";
-import React, { useState } from "react";
+import { API_URL, readApiResponse } from "../api.js";
+import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "./RegistrationD3.css";
 
@@ -136,7 +136,7 @@ export default function RegistrationStep3() {
         }
       );
 
-      const result = await response.json();
+      const result = await readApiResponse(response);
 
       console.log("=================================");
       console.log("REGISTRATION RESPONSE");

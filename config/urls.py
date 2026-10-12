@@ -1,3 +1,4 @@
+
 from pathlib import Path
 
 from django.contrib import admin
@@ -44,51 +45,34 @@ urlpatterns = [
     path("admin/", admin.site.urls),
 
     # Registration API
-    path(
-        "api/registrations/",
-        include("registrations.urls")
-    ),
+    path("api/registrations/", include("registrations.urls")),
 
     # Account / Login API
-    path(
-        "api/accounts/",
-        include("accounts.urls")
-    ),
+    path("api/accounts/", include("accounts.urls")),
 
     # Admin Panel API
-    path(
-        "api/adminpanel/",
-        include("adminpanel.urls")
-    ),
+    path("api/adminpanel/", include("adminpanel.urls")),
 
     # React Vite assets
     path(
         "assets/<path:path>",
         serve,
-        {
-            "document_root": FRONTEND_DIR / "assets"
-        }
+        {"document_root": FRONTEND_DIR / "assets"}
     ),
 
     # React root files
     re_path(
         r"^(?P<path>favicon\.svg|icons\.svg)$",
         serve,
-        {
-            "document_root": FRONTEND_DIR
-        }
+        {"document_root": FRONTEND_DIR}
     ),
 
     # React homepage
-    path(
-        "",
-        frontend,
-        name="frontend"
-    ),
+    path("", frontend, name="frontend"),
 
     # React Router pages
     re_path(
-        r"^(?!api/|admin/|assets/|static/|media/|health/).*$",
+        r"^(?!api/|admin/|assets/|static/|media/|health/).*",
         frontend
     ),
 ]
@@ -99,3 +83,12 @@ if settings.DEBUG:
         settings.MEDIA_URL,
         document_root=settings.MEDIA_ROOT
     )
+else:
+    urlpatterns += [
+        re_path(
+            r"^media/profiles/(?P<path>(?!pending_gallery/|pending_changes/).*)$",
+            serve,
+            {"document_root": settings.MEDIA_ROOT / "profiles"},
+            name="production-profile-media",
+        ),
+    ]

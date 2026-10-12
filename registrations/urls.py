@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views import (
     RegistrationCreateView,
+    RegistrationAvailabilityView,
     PublishedRegistrationListView,
     PublishedRegistrationDetailView,
     PendingRegistrationListView,
@@ -22,6 +23,7 @@ from .views import (
     ClientPhotoListView,
     ClientPhotoUploadView,
     ClientPhotoActionView,
+    PendingFileView,
     ConversationListView,
     ConversationDetailView,
     SendMessageView,
@@ -30,6 +32,8 @@ from .views import (
 
 
 urlpatterns = [
+
+    path("availability/", RegistrationAvailabilityView.as_view(), name="registration-availability"),
 
     # =========================================================
     # USER REGISTRATION
@@ -163,6 +167,11 @@ urlpatterns = [
         "photos/<int:slot_index>/<str:action>/",
         ClientPhotoActionView.as_view(),
         name="client-photo-action"
+    ),
+    path(
+        "pending-files/<str:kind>/<int:pk>/",
+        PendingFileView.as_view(),
+        name="pending-profile-file",
     ),
 
 

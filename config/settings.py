@@ -16,9 +16,10 @@ SECRET_KEY = os.getenv(
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 
 ALLOWED_HOSTS = [
-    "matrimonynew-production.up.railway.app",
-    "localhost",
-    "127.0.0.1",
+    host.strip() for host in os.getenv(
+        "DJANGO_ALLOWED_HOSTS",
+        "matrimonynew-production.up.railway.app,localhost,127.0.0.1",
+    ).split(",") if host.strip()
 ]
 
 
@@ -215,7 +216,11 @@ STORAGES = {
 # =========================================================
 
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = Path(
+    os.getenv("MEDIA_ROOT")
+    or os.getenv("RAILWAY_VOLUME_MOUNT_PATH")
+    or BASE_DIR / "media"
+)
 
 
 # =========================================================
@@ -237,9 +242,10 @@ REST_FRAMEWORK = {
 # =========================================================
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "https://matrimony-sepia-phi.vercel.app",
+    origin.strip().rstrip("/") for origin in os.getenv(
+        "CORS_ALLOWED_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173,https://matrimony-sepia-phi.vercel.app",
+    ).split(",") if origin.strip()
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -268,10 +274,10 @@ CORS_ALLOW_HEADERS = [
 # =========================================================
 
 CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "https://matrimony-sepia-phi.vercel.app",
-    "https://matrimonynew-production.up.railway.app",
+    origin.strip().rstrip("/") for origin in os.getenv(
+        "CSRF_TRUSTED_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173,https://matrimony-sepia-phi.vercel.app,https://matrimonynew-production.up.railway.app",
+    ).split(",") if origin.strip()
 ]
 
 # =========================================================
@@ -295,7 +301,17 @@ if IS_RAILWAY:
 # EMAIL
 # =========================================================
 
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() == "true"
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "webmaster@localhost")
+EMAIL_BACKEND = (
+    "django.core.mail.backends.smtp.EmailBackend"
+    if EMAIL_HOST or os.getenv("RAILWAY_ENVIRONMENT")
+    else "django.core.mail.backends.console.EmailBackend"
+)
 
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

@@ -108,6 +108,16 @@ class ProfileChange(models.Model):
         blank=True
     )
 
+    pending_profile_photo = models.ImageField(
+        upload_to="profiles/pending_changes/", blank=True, null=True
+    )
+    pending_identity_document = models.FileField(
+        upload_to="documents/pending_changes/", blank=True, null=True
+    )
+    pending_additional_document = models.FileField(
+        upload_to="documents/pending_changes/", blank=True, null=True
+    )
+
     previous_status = models.CharField(
         max_length=30,
         default="PENDING"

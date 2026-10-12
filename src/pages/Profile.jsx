@@ -1,116 +1,59 @@
-import React from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { API_URL } from "../api.js";
 import "./Profile.css";
 
 export default function Profiles() {
-  const profiles = [
-    {
-      id: "WN100001",
-      name: "Anjali",
-      age: 24,
-      religion: "Hindu",
-      profession: "Software Engineer",
-      location: "Kochi",
-      image: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8N3x8cG9ydHJhaXR8ZW58MHx8MHx8fDA%3D",
-    },
-    {
-      id: "WN100002",
-      name: "Athira",
-      age: 25,
-      religion: "Christian",
-      profession: "Doctor",
-      location: "Calicut",
-      image: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTB8fHBvcnRyYWl0fGVufDB8fDB8fHww",
-    },
-    {
-      id: "WN100003",
-      name: "Meera",
-      age: 23,
-      religion: "Hindu",
-      profession: "Teacher",
-      location: "Thrissur",
-      image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MjB8fHBvcnRyYWl0fGVufDB8fDB8fHww",
-    },
-    {
-      id: "WN100004",
-      name: "Hari",
-      age: 26,
-      religion: "Hindu",
-      profession: "Architect",
-      location: "Kannur",
-      image: "https://images.unsplash.com/photo-1596075780750-81249df16d19?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NDF8fHBvcnRyYWl0fGVufDB8fDB8fHww",
-    },
-    {
-      id: "WN100005",
-      name: "kiran",
-      age: 27,
-      religion: "Hindu",
-      profession: "HR Manager",
-      location: "Malappuram",
-      image: "https://images.unsplash.com/photo-1611695434398-4f4b330623e6?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NTB8fHBvcnRyYWl0fGVufDB8fDB8fHww",
-    },
-    {
-      id: "WN100006",
-      name: "Manu",
-      age: 24,
-      religion: "Christian",
-      profession: "Nurse",
-      location: "Kottayam",
-      image: "https://images.unsplash.com/photo-1531891437562-4301cf35b7e4?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NjR8fHBvcnRyYWl0fGVufDB8fDB8fHww",
-    },
-  ];
+  const [profiles, setProfiles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetch(`${API_URL}/registrations/published/`)
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.detail || "Unable to load profiles.");
+        setProfiles(Array.isArray(data) ? data : data.results || []);
+      })
+      .catch((requestError) => setError(requestError.message))
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <div className="profiles-page">
-
       <div className="profiles-header">
         <h1>Verified Matrimony Profiles</h1>
-        <p>
-          Find your perfect life partner from our verified profiles.
-        </p>
+        <p>Browse profiles approved and published by our team.</p>
       </div>
+
+      {loading ? <p role="status">Loading published profiles…</p> : null}
+      {error ? <p role="alert">{error}</p> : null}
+      {!loading && !error && profiles.length === 0 ? <p>No published profiles are available yet.</p> : null}
 
       <div className="profiles-grid">
         {profiles.map((profile) => (
-          <div className="profile-card" key={profile.id}>
-
-            <img
-              src={profile.image}
-              alt={profile.name}
-              className="profile-image"
-            />
-
+          <article className="profile-card" key={profile.id}>
+            <ProfilePhoto url={profile.profile_photo_url} name={profile.full_name} />
             <div className="profile-content">
-
-              <span className="profile-id">
-                {profile.id}
-              </span>
-
-              <h3>{profile.name}</h3>
-
-              <p>
-                {profile.age} Years
-              </p>
-
+              <span className="profile-id">{profile.matrimony_id || "Verified profile"}</span>
+              <h3>{profile.full_name}</h3>
+              {profile.age ? <p>{profile.age} Years</p> : null}
               <p>{profile.religion}</p>
-
-              <p>{profile.profession}</p>
-
-              <p>{profile.location}</p>
-
-              <Link
-                to={`/profiles/${profile.id}`}
-                className="view-btn"
-              >
-                View Profile
-              </Link>
-
+              <p>{profile.occupation || profile.education}</p>
+              <p>{[profile.city, profile.district, profile.state].filter(Boolean).join(", ")}</p>
+              <Link to={`/profiles/${profile.id}`} className="view-btn">View Profile</Link>
             </div>
-
-          </div>
+          </article>
         ))}
       </div>
-
     </div>
   );
+}
+
+function ProfilePhoto({ url, name }) {
+  const [failed, setFailed] = useState(false);
+  if (!url || failed) {
+    return <div className="profile-image profile-image-placeholder" aria-label="No profile photo">{name?.charAt(0)?.toUpperCase() || "?"}</div>;
+  }
+  return <img src={url} alt={name} className="profile-image" onError={() => setFailed(true)} />;
 }

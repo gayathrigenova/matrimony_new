@@ -1,7 +1,9 @@
 import { API_URL } from "../../api.js";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ClientLayout from "../../components/ClientLayout";
+import ProtectedImage from "../../components/ProtectedImage";
+import ProtectedFileLink from "../../components/ProtectedFileLink";
 import "./EditProfile.css";
 
 
@@ -65,18 +67,9 @@ export default function EditProfile() {
 
   const token = localStorage.getItem("access_token");
 
-  useEffect(() => {
-    if (!uploads.profile_photo) {
-      setProfilePhotoPreview("");
-      return undefined;
-    }
-
-    const previewUrl = URL.createObjectURL(uploads.profile_photo);
-    setProfilePhotoPreview(previewUrl);
-    setProfilePhotoFailed(false);
-
-    return () => URL.revokeObjectURL(previewUrl);
-  }, [uploads.profile_photo]);
+  useEffect(() => () => {
+    if (profilePhotoPreview.startsWith("blob:")) URL.revokeObjectURL(profilePhotoPreview);
+  }, [profilePhotoPreview]);
 
   useEffect(() => {
     if (!token) {
@@ -115,11 +108,12 @@ export default function EditProfile() {
           status: data.status || "PENDING",
           correction: data.correction_reason || "",
           rejection: data.rejection_reason || "",
-          profilePhoto: data.profile_photo_url || "",
-          identityDocument: data.identity_document_url || "",
-          additionalDocument: data.additional_document_url || "",
+          profilePhoto: data.pending_profile_photo_url || data.profile_photo_url || "",
+          identityDocument: data.pending_identity_document_url || data.identity_document_url || "",
+          additionalDocument: data.pending_additional_document_url || data.additional_document_url || "",
         });
-        setFormData({
+        setFormData((current) => ({
+          ...current,
           full_name: data.full_name || "",
           gender: data.gender || "",
           date_of_birth: data.date_of_birth || "",
@@ -165,7 +159,8 @@ export default function EditProfile() {
           country_code: data.country_code || "+91",
           contact_phone: data.contact_phone || "",
           extra_phone: data.extra_phone || "",
-        });
+          ...Object.fromEntries(Object.entries(data.pending_data || {}).filter(([key]) => key in current)),
+        }));
       })
       .catch((err) => {
         setMessage({ type: "error", text: err.message || "Error loading profile data." });
@@ -178,6 +173,16 @@ export default function EditProfile() {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleUploadSelected = (event) => {
+    const { name, files } = event.target;
+    const file = files?.[0] || null;
+    setUploads((current) => ({ ...current, [name]: file }));
+    if (name === "profile_photo") {
+      setProfilePhotoPreview(file ? URL.createObjectURL(file) : "");
+      setProfilePhotoFailed(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -256,12 +261,16 @@ export default function EditProfile() {
           <div className="edit-form-card">
             <h3 className="edit-form-title">Profile photo and documents</h3>
             <div className="profile-upload-preview">
-              {(profilePhotoPreview || review.profilePhoto) && !profilePhotoFailed ? (
+              {profilePhotoPreview ? (
                 <img
-                  src={profilePhotoPreview || review.profilePhoto}
-                  alt={profilePhotoPreview ? "Selected profile photo preview" : "Current profile photo"}
+                src={profilePhotoPreview}
+                alt="Selected profile photo preview"
                   onError={() => setProfilePhotoFailed(true)}
                 />
+              ) : review.profilePhoto?.includes("/pending-files/profile-photo/") ? (
+                <ProtectedImage src={review.profilePhoto} alt="Pending profile photo" />
+              ) : review.profilePhoto && !profilePhotoFailed ? (
+                <img src={review.profilePhoto} alt="Current profile photo" onError={() => setProfilePhotoFailed(true)} />
               ) : (
                 <div className="edit-profile-photo-placeholder" aria-label="No profile photo">
                   {formData.full_name?.charAt(0)?.toUpperCase() || "U"}
@@ -269,13 +278,13 @@ export default function EditProfile() {
               )}
             </div>
             <div className="form-grid">
-              <FileField label="Profile photo" name="profile_photo" accept="image/*" uploads={uploads} setUploads={setUploads} />
+              <FileField label="Profile photo" name="profile_photo" accept="image/*" uploads={uploads} setUploads={setUploads} onChange={handleUploadSelected} />
               <FileField label="Identity document" name="identity_document" accept=".pdf,image/*" uploads={uploads} setUploads={setUploads} />
               <FileField label="Additional document" name="additional_document" accept=".pdf,image/*" uploads={uploads} setUploads={setUploads} />
             </div>
             <div className="details-grid">
-              {review.identityDocument && <p>Identity document saved: <a href={review.identityDocument} target="_blank" rel="noreferrer">View document</a></p>}
-              {review.additionalDocument && <p>Additional document saved: <a href={review.additionalDocument} target="_blank" rel="noreferrer">View document</a></p>}
+              {review.identityDocument && <p>Identity document saved: <ProtectedFileLink href={review.identityDocument}>View document</ProtectedFileLink></p>}
+              {review.additionalDocument && <p>Additional document saved: <ProtectedFileLink href={review.additionalDocument}>View document</ProtectedFileLink></p>}
             </div>
             <p>Manage multiple profile photos from <button type="button" className="btn-cancel" onClick={() => navigate("/photos")}>My Photos</button>.</p>
           </div>
@@ -607,11 +616,11 @@ function getApiErrorMessage(result, status) {
   return "Failed to update profile.";
 }
 
-function FileField({ label, name, accept, uploads, setUploads }) {
+function FileField({ label, name, accept, uploads, setUploads, onChange }) {
   return (
     <div className="form-group">
       <label htmlFor={name}>{label}</label>
-      <input id={name} type="file" accept={accept} onChange={(event) => setUploads((current) => ({ ...current, [name]: event.target.files?.[0] || null }))} />
+      <input id={name} type="file" accept={accept} onChange={onChange || ((event) => setUploads((current) => ({ ...current, [name]: event.target.files?.[0] || null })))} />
       {uploads[name] && <small>{uploads[name].name}</small>}
     </div>
   );

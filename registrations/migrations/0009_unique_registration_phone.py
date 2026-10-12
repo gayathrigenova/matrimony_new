@@ -19,10 +19,20 @@ def reject_existing_duplicate_phones(apps, schema_editor):
             "Cannot enforce unique registration phone numbers. Resolve these existing duplicates first: "
             + ", ".join(duplicates)
         )
+
+
+def convert_blank_phones_to_null(apps, schema_editor):
+    """Use NULL for missing phones only after the column permits NULL."""
+    Registration = apps.get_model("registrations", "Registration")
     for registration in Registration.objects.exclude(phone__isnull=True).only("id", "phone").iterator():
-        normalized = registration.phone.strip()
-        if normalized != registration.phone or not normalized:
-            Registration.objects.filter(pk=registration.pk).update(phone=normalized or None)
+        if not registration.phone.strip():
+            Registration.objects.filter(pk=registration.pk).update(phone=None)
+
+
+def restore_blank_phones(apps, schema_editor):
+    """Reverse the blank-to-NULL conversion before making phone non-nullable."""
+    Registration = apps.get_model("registrations", "Registration")
+    Registration.objects.filter(phone__isnull=True).update(phone="")
 
 
 class Migration(migrations.Migration):
@@ -33,6 +43,12 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunPython(reject_existing_duplicate_phones, migrations.RunPython.noop),
+        migrations.AlterField(
+            model_name='registration',
+            name='phone',
+            field=models.CharField(blank=True, max_length=20, null=True),
+        ),
+        migrations.RunPython(convert_blank_phones_to_null, restore_blank_phones),
         migrations.AlterField(
             model_name='registration',
             name='phone',

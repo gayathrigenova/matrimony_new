@@ -1,15 +1,17 @@
 
+import mimetypes
 from pathlib import Path
 
 from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
-from django.http import FileResponse, JsonResponse
+from django.http import FileResponse, HttpResponseNotFound, JsonResponse
 from django.urls import include, path, re_path
 from django.views.static import serve
 
 
 FRONTEND_DIR = Path(settings.BASE_DIR) / "dist"
+FRONTEND_ASSETS_DIR = FRONTEND_DIR / "assets"
 
 
 def health_check(request):
@@ -37,6 +39,30 @@ def frontend(request):
     )
 
 
+def frontend_asset(request, path):
+    assets_directory = FRONTEND_ASSETS_DIR.resolve()
+    try:
+        asset_file = (assets_directory / path).resolve(strict=True)
+        asset_file.relative_to(assets_directory)
+    except (OSError, ValueError):
+        return HttpResponseNotFound(
+            "Asset not found",
+            content_type="text/plain",
+        )
+
+    if not asset_file.is_file():
+        return HttpResponseNotFound(
+            "Asset not found",
+            content_type="text/plain",
+        )
+
+    return FileResponse(
+        asset_file.open("rb"),
+        content_type=mimetypes.guess_type(asset_file.name)[0]
+        or "application/octet-stream",
+    )
+
+
 urlpatterns = [
     # Health check
     path("health/", health_check, name="health-check"),
@@ -56,8 +82,7 @@ urlpatterns = [
     # React Vite assets
     path(
         "assets/<path:path>",
-        serve,
-        {"document_root": FRONTEND_DIR / "assets"}
+        frontend_asset,
     ),
 
     # React root files

@@ -2,8 +2,11 @@
 
 ## Railway backend
 
-Deploy the repository root as the Railway service root. The `railway.toml`
-command applies migrations, collects static files, and starts Gunicorn. Set:
+Deploy the repository root as the Railway service root. Nixpacks builds the
+Vite frontend and verifies that every JS/CSS URL in `dist/index.html` exists
+under `dist/assets/` before collecting Django static files. Railway starts the
+service only after that build succeeds; the start command applies migrations
+and starts Gunicorn. Set:
 
 - `DJANGO_SECRET_KEY`: private production Django key.
 - `DJANGO_ALLOWED_HOSTS`: comma separated backend hosts.
@@ -30,7 +33,18 @@ The deployment command runs database migrations before startup. Confirm that
 
 This repository contains the React/Vite app. Set `VITE_API_URL` to the Railway
 backend origin without `/api` before building. `src/api.js` appends `/api`.
-Redeploy the frontend after code changes.
+Build and verify the frontend locally from the repository root:
+
+```powershell
+npm ci
+npm run build
+npm run verify:build
+```
+
+The build command also runs the asset verification. In Django, existing
+`/assets/...` files are served with their file MIME type; missing asset paths
+return a plain-text 404 and are excluded from the React Router fallback.
+Redeploy the Railway service after code changes.
 
 ## Verification
 

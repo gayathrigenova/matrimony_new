@@ -1,7 +1,8 @@
 import { API_URL } from "../../api.js";
-import React, { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ClientLayout from "../../components/ClientLayout";
+import ProtectedImage from "../../components/ProtectedImage";
 import "./MyPhotos.css";
 
 
@@ -14,7 +15,7 @@ export default function MyPhotos() {
 
   const token = localStorage.getItem("access_token");
 
-  const fetchPhotos = () => {
+  const fetchPhotos = useCallback(() => {
     setLoading(true);
     fetch(`${API_URL}/registrations/photos/`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -30,15 +31,16 @@ export default function MyPhotos() {
         setMessage({ type: "error", text: err.message });
       })
       .finally(() => setLoading(false));
-  };
+  }, [token]);
 
   useEffect(() => {
     if (!token) {
       navigate("/login");
       return;
     }
-    fetchPhotos();
-  }, [token, navigate]);
+    const timer = setTimeout(fetchPhotos, 0);
+    return () => clearTimeout(timer);
+  }, [token, navigate, fetchPhotos]);
 
   const handleFileUpload = (e, slotIndex) => {
     const file = e.target.files?.[0];
@@ -141,7 +143,7 @@ export default function MyPhotos() {
         ) : (
           <div className="photos-grid">
             {photoSlots.map((slot) => {
-              const displayPhoto = slot.photo_url || slot.pending_photo_url;
+              const displayPhoto = slot.pending_photo_url || slot.photo_url;
               return (
                 <div key={slot.slot_index} className="photo-slot-card">
                   <div className="photo-slot-header">
@@ -154,8 +156,12 @@ export default function MyPhotos() {
                   <div className="photo-display-area">
                     {displayPhoto ? (
                       <>
-                        <img src={displayPhoto} alt={`Slot ${slot.slot_index}`} />
-                        {slot.pending_photo_url && (
+                        {slot.pending_photo_url ? (
+                          <ProtectedImage src={slot.pending_photo_url} alt={`Slot ${slot.slot_index}`} />
+                        ) : (
+                          <img src={displayPhoto} alt={`Slot ${slot.slot_index}`} />
+                        )}
+                        {(slot.pending_photo_url || slot.status === "PENDING") && (
                           <div className="pending-photo-overlay">
                             ⏳ Pending Admin Verification
                           </div>

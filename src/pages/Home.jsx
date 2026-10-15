@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Mail,
@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 
 import './Home.css';
+import { API_URL, readApiResponse } from "../api.js";
 
 const sliderContent = [
   {
@@ -55,13 +56,30 @@ export default function Home() {
     phone: '',
     age: '',
   });
+  const [phoneError, setPhoneError] = useState("");
+  const [checkingPhone, setCheckingPhone] = useState(false);
 
   const handleFormChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+    if (e.target.name === "phone") setPhoneError("");
   };
 
-  const handleRegisterSubmit = (e) => {
+  const handleRegisterSubmit = async (e) => {
     e.preventDefault();
+    setPhoneError("");
+    setCheckingPhone(true);
+    try {
+      const response = await fetch(`${API_URL}/registrations/availability/`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: formData.phone }),
+      });
+      const result = await readApiResponse(response);
+      if (!response.ok) throw new Error(result.detail || "Could not verify this number. Please try again.");
+      if (result.errors?.phone) { setPhoneError(result.errors.phone); return; }
+    } catch (error) {
+      setPhoneError(error.message || "Could not verify this number. Please try again.");
+      return;
+    } finally { setCheckingPhone(false); }
     navigate('/registration', {
       state: {
         name: formData.name,
@@ -92,7 +110,7 @@ export default function Home() {
 
           <div className="hero-form-card">
             <div className="hero-form-header">
-              <h3>Find Your Partner From <span className="highlight-text">2 Lakh+</span> Profiles</h3>
+              <h3>Find Your Partner From Profiles</h3>
             </div>
             <form onSubmit={handleRegisterSubmit}>
               <div className="hero-form-row">
@@ -104,6 +122,7 @@ export default function Home() {
                   <input type="tel" name="phone" placeholder="Mobile Number" value={formData.phone} onChange={handleFormChange} required />
                 </div>
               </div>
+              {phoneError && <p className="registration-field-error" role="alert">{phoneError}</p>}
 
               <div className="hero-form-row">
                 <div
@@ -142,13 +161,15 @@ export default function Home() {
                 </label>
               </div>
                 
-              <button type="submit" className="hero-register-btn">
-                Register Free
+              <button type="submit" className="hero-register-btn" disabled={checkingPhone}>
+                {checkingPhone ? "Checking..." : "Register Free"}
               </button>
 
               <div className="hero-form-footer">
                 <span>🎧 Support</span>
-                <span>💬 Chat for assistance</span>
+                <a href="https://wa.me/917559080005" target="_blank" rel="noreferrer">
+                  💬 Chat for assistance
+                </a>
               </div>
             </form>
           </div>

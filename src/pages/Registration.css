@@ -464,3 +464,9 @@
     font-size: 0.9rem;
   }
 }
+.registration-field-error {
+  display: block;
+  color: #b42318;
+  font-size: 0.875rem;
+  margin-top: 0.35rem;
+}

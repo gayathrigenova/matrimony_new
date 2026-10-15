@@ -1,6 +1,8 @@
 import { API_URL } from "../../api.js";
-import React, { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import ProtectedImage from "../../components/ProtectedImage";
+import ProtectedFileLink from "../../components/ProtectedFileLink";
 
 export default function RegistrationReview() {
   const { id } = useParams();
@@ -17,7 +19,7 @@ export default function RegistrationReview() {
   // ==========================================
   // FETCH REGISTRATION DETAILS
   // ==========================================
-  const fetchRegistration = async () => {
+  const fetchRegistration = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -56,11 +58,12 @@ export default function RegistrationReview() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, navigate, token]);
 
   useEffect(() => {
-    fetchRegistration();
-  }, [id]);
+    const timer = setTimeout(fetchRegistration, 0);
+    return () => clearTimeout(timer);
+  }, [fetchRegistration]);
 
   // ==========================================
   // ADMIN ACTION
@@ -106,10 +109,10 @@ export default function RegistrationReview() {
       const url = `${API_URL}/adminpanel/registrations/${id}/${action}/`;
 
       const body =
-        action === "correction" || action === "reject"
-          ? JSON.stringify({
-              reason: reason.trim(),
-            })
+        action === "correction"
+          ? JSON.stringify({ correction_message: reason.trim() })
+          : action === "reject"
+          ? JSON.stringify({ rejection_reason: reason.trim() })
           : null;
 
       const response = await fetch(url, {
@@ -527,6 +530,25 @@ export default function RegistrationReview() {
 
       </Section>
 
+      {data.profile_photo?.includes("/pending-files/profile-photo/") && (
+        <Section title="Profile Photo Awaiting Approval">
+          <ProtectedImage src={data.profile_photo} alt="Pending profile photo" style={{ maxWidth: 260, borderRadius: 8 }} />
+        </Section>
+      )}
+
+      {registration.pending_photos?.length > 0 && (
+        <Section title="Photos Awaiting Approval">
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
+            {registration.pending_photos.map((photo) => (
+              <figure key={photo.slot_index} style={{ margin: 0, width: 180 }}>
+                <ProtectedImage src={photo.url} alt={`Pending photo ${photo.slot_index}`} style={{ width: "100%", borderRadius: 8 }} />
+                <figcaption>Photo {photo.slot_index} · Pending review</figcaption>
+              </figure>
+            ))}
+          </div>
+        </Section>
+      )}
+
       {/* ======================================
           ADMIN VERIFICATION
       ======================================= */}
@@ -664,7 +686,9 @@ function Document({ label, url }) {
         {label}
       </span>
 
-      {url ? (
+      {url?.includes("/pending-files/") ? (
+        <ProtectedFileLink href={url}>View Document</ProtectedFileLink>
+      ) : url ? (
         <a
           href={url}
           target="_blank"

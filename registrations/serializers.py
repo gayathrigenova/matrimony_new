@@ -1,5 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError, transaction
+from PIL import Image, UnidentifiedImageError
 
 from .models import (
     Registration,
@@ -13,6 +15,36 @@ from .models import (
 
 
 User = get_user_model()
+
+
+def validate_upload(value, image, max_bytes):
+    if value is None:
+        return value
+    if value.size > max_bytes:
+        raise serializers.ValidationError("File exceeds the allowed size limit.")
+    allowed = (".jpg", ".jpeg", ".png", ".webp") if image else (".pdf", ".jpg", ".jpeg", ".png")
+    if not value.name.lower().endswith(allowed):
+        raise serializers.ValidationError("Unsupported file type.")
+    extension = value.name.lower().rsplit(".", 1)[-1]
+    if extension == "pdf":
+        if value.read(5) != b"%PDF-":
+            raise serializers.ValidationError("The uploaded document is not a valid PDF.")
+        value.seek(0)
+    else:
+        try:
+            image_file = Image.open(value)
+            image_file.verify()
+            value.seek(0)
+        except (UnidentifiedImageError, OSError, ValueError, SyntaxError):
+            raise serializers.ValidationError("The uploaded file is not a valid image.") from None
+    return value
+
+
+def absolute_file_url(request, file_field):
+    if not file_field:
+        return None
+    url = file_field.url
+    return request.build_absolute_uri(url) if request else url
 
 
 # =========================================================
@@ -110,28 +142,53 @@ class RegistrationSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
+    def validate_profile_photo(self, value):
+        validate_upload(value, image=True, max_bytes=5 * 1024 * 1024)
+        return value
+
+    def validate_identity_document(self, value):
+        validate_upload(value, image=False, max_bytes=10 * 1024 * 1024)
+        return value
+
+    def validate_additional_document(self, value):
+        validate_upload(value, image=False, max_bytes=10 * 1024 * 1024)
+        return value
+
+    def validate_email(self, value):
+        value = value.strip().lower()
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError(
+                "This email address is already registered. Please log in or use a different email address."
+            )
+        return value
+
+    def validate_phone(self, value):
+        value = value.strip()
+        if value and Registration.objects.filter(phone__iexact=value).exists():
+            raise serializers.ValidationError(
+                "This phone number is already registered. Please use a different number."
+            )
+        return value or None
+
     def create(self, validated_data):
         email = validated_data.pop("email").strip().lower()
         password = validated_data.pop("password")
-
-        if User.objects.filter(email=email).exists():
-            raise serializers.ValidationError({
-                "email": "This email is already registered."
-            })
-
-        user = User.objects.create_user(
-            email=email,
-            password=password,
-            full_name=validated_data.get("full_name", ""),
-            role=User.Role.CLIENT,
-        )
-
-        registration = Registration.objects.create(
-            user=user,
-            **validated_data
-        )
-
-        return registration
+        try:
+            with transaction.atomic():
+                user = User.objects.create_user(
+                    email=email,
+                    password=password,
+                    full_name=validated_data.get("full_name", ""),
+                    role=User.Role.CLIENT,
+                )
+                return Registration.objects.create(user=user, **validated_data)
+        except IntegrityError:
+            if User.objects.filter(email__iexact=email).exists():
+                raise serializers.ValidationError({"email": "This email address is already registered. Please log in or use a different email address."}) from None
+            phone = validated_data.get("phone")
+            if phone and Registration.objects.filter(phone__iexact=phone).exists():
+                raise serializers.ValidationError({"phone": "This phone number is already registered. Please use a different number."}) from None
+            raise
 
 
 # =========================================================
@@ -216,6 +273,22 @@ class ClientProfileSerializer(serializers.ModelSerializer):
 
     age = serializers.SerializerMethodField()
     profile_photo_url = serializers.SerializerMethodField()
+    identity_document_url = serializers.SerializerMethodField()
+    additional_document_url = serializers.SerializerMethodField()
+    pending_data = serializers.SerializerMethodField()
+    pending_profile_photo_url = serializers.SerializerMethodField()
+    pending_identity_document_url = serializers.SerializerMethodField()
+    pending_additional_document_url = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+
+    def validate_profile_photo(self, value):
+        return validate_upload(value, image=True, max_bytes=5 * 1024 * 1024)
+
+    def validate_identity_document(self, value):
+        return validate_upload(value, image=False, max_bytes=10 * 1024 * 1024)
+
+    def validate_additional_document(self, value):
+        return validate_upload(value, image=False, max_bytes=10 * 1024 * 1024)
 
     class Meta:
         model = Registration
@@ -251,6 +324,14 @@ class ClientProfileSerializer(serializers.ModelSerializer):
             "about",
             "profile_photo",
             "profile_photo_url",
+            "identity_document",
+            "identity_document_url",
+            "additional_document",
+            "additional_document_url",
+            "pending_data",
+            "pending_profile_photo_url",
+            "pending_identity_document_url",
+            "pending_additional_document_url",
             "father_name",
             "father_occupation",
             "mother_name",
@@ -285,6 +366,12 @@ class ClientProfileSerializer(serializers.ModelSerializer):
             "matrimony_id",
             "age",
             "profile_photo_url",
+            "identity_document_url",
+            "additional_document_url",
+            "pending_data",
+            "pending_profile_photo_url",
+            "pending_identity_document_url",
+            "pending_additional_document_url",
             "status",
             "correction_reason",
             "rejection_reason",
@@ -312,6 +399,61 @@ class ClientProfileSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(url)
             return url
         return None
+
+    def get_identity_document_url(self, obj):
+        return self._client_file_url(obj, "client-identity-document")
+
+    def get_additional_document_url(self, obj):
+        return self._client_file_url(obj, "client-additional-document")
+
+    def _client_file_url(self, obj, kind):
+        request = self.context.get("request")
+        if not getattr(obj, "identity_document" if "identity" in kind else "additional_document"):
+            return None
+        path = f"/api/registrations/pending-files/{kind}/{obj.pk}/"
+        return request.build_absolute_uri(path) if request else path
+
+    def _pending_change(self, obj):
+        return obj.profile_changes.filter(
+            status__in=("PENDING_REVIEW", "CORRECTION_REQUIRED", "REJECTED")
+        ).first()
+
+    def _latest_change(self, obj):
+        return obj.profile_changes.exclude(status="APPROVED").first()
+
+    def get_pending_data(self, obj):
+        change = self._pending_change(obj)
+        return change.pending_data if change else {}
+
+    def get_pending_profile_photo_url(self, obj):
+        change = self._pending_change(obj)
+        if not change or not change.pending_profile_photo:
+            return None
+        request = self.context.get("request")
+        path = f"/api/registrations/pending-files/profile-photo/{change.pk}/"
+        return request.build_absolute_uri(path) if request else path
+
+    def _pending_file_url(self, obj, field):
+        change = self._pending_change(obj)
+        if not change or not getattr(change, f"pending_{field}"):
+            return None
+        request = self.context.get("request")
+        path = f"/api/registrations/pending-files/{field.replace('_', '-')}/{change.pk}/"
+        return request.build_absolute_uri(path) if request else path
+
+    def get_pending_identity_document_url(self, obj):
+        return self._pending_file_url(obj, "identity_document")
+
+    def get_pending_additional_document_url(self, obj):
+        return self._pending_file_url(obj, "additional_document")
+
+    def get_status(self, obj):
+        change = self._latest_change(obj)
+        if change and change.status == "PENDING_REVIEW":
+            return "UNDER_REVIEW"
+        if change and change.status in ("CORRECTION_REQUIRED", "REJECTED"):
+            return change.status
+        return obj.status
 
 
 # =========================================================
@@ -551,8 +693,8 @@ class ClientPhotoSerializer(serializers.ModelSerializer):
     def get_pending_photo_url(self, obj):
         request = self.context.get("request")
         if obj.pending_photo:
-            url = obj.pending_photo.url
-            return request.build_absolute_uri(url) if request else url
+            path = f"/api/registrations/pending-files/gallery-photo/{obj.pk}/"
+            return request.build_absolute_uri(path) if request else path
         return None
 
 

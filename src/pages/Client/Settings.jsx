@@ -99,6 +99,7 @@ export default function Settings() {
 
   const confirmLogout = () => {
     localStorage.clear();
+    window.dispatchEvent(new Event("auth-change"));
     navigate("/login");
   };
 

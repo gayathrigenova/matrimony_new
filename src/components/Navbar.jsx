@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import './Navbar.css';
 import logo from '../assets/logo1.png';
@@ -8,13 +8,24 @@ export default function Navbar() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const navigate = useNavigate();
+  const [isClientLoggedIn, setIsClientLoggedIn] = useState(hasClientSession);
+
+  useEffect(() => {
+    const refreshClientStatus = () => setIsClientLoggedIn(hasClientSession());
+    window.addEventListener('auth-change', refreshClientStatus);
+    window.addEventListener('storage', refreshClientStatus);
+    return () => {
+      window.removeEventListener('auth-change', refreshClientStatus);
+      window.removeEventListener('storage', refreshClientStatus);
+    };
+  }, []);
 
   const pages = [
     { name: 'Home', path: '/' },
     { name: 'Search', path: '/search' },
+    ...(isClientLoggedIn ? [{ name: 'My Profile', path: '/dashboard' }] : []),
     { name: 'Membership', path: '/membership' },
     { name: 'Register', path: '/registration' },
-    { name: 'Profiles', path: '/profiles' },
     { name: 'Contact Us', path: '/contact' },
   ];
 
@@ -109,4 +120,13 @@ export default function Navbar() {
       </div>
     </nav>
   );
+}
+
+function hasClientSession() {
+  if (!localStorage.getItem('access_token')) return false;
+  try {
+    return JSON.parse(localStorage.getItem('user') || 'null')?.role === 'CLIENT';
+  } catch {
+    return false;
+  }
 }

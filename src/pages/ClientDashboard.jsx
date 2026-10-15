@@ -2,6 +2,7 @@ import { API_URL } from "../api.js";
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./ClientDashboard.css";
+import ClientLayout from "../components/ClientLayout";
 
 
 export default function ClientDashboard() {
@@ -18,7 +19,6 @@ export default function ClientDashboard() {
   ]);
 
   const [selectedPhoto, setSelectedPhoto] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const token = localStorage.getItem("access_token");
 
@@ -46,6 +46,7 @@ export default function ClientDashboard() {
             localStorage.removeItem("access_token");
             localStorage.removeItem("refresh_token");
             localStorage.removeItem("user");
+            window.dispatchEvent(new Event("auth-change"));
 
             navigate("/login");
             return;
@@ -74,18 +75,6 @@ export default function ClientDashboard() {
         setLoading(false);
       });
   }, [token, navigate]);
-
-  /* =========================================================
-     LOGOUT
-  ========================================================= */
-
-  const handleLogout = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    localStorage.removeItem("user");
-
-    navigate("/login");
-  };
 
   /* =========================================================
      PHOTO SELECT
@@ -242,10 +231,12 @@ export default function ClientDashboard() {
 
   if (loading) {
     return (
-      <div className="dashboard-loading">
-        <div className="loading-spinner"></div>
-        <p>Loading your dashboard...</p>
-      </div>
+      <ClientLayout>
+        <div className="dashboard-loading">
+          <div className="loading-spinner"></div>
+          <p>Loading your dashboard...</p>
+        </div>
+      </ClientLayout>
     );
   }
 
@@ -255,212 +246,31 @@ export default function ClientDashboard() {
 
   if (!profile) {
     return (
-      <div className="dashboard-error">
-        <div className="error-box">
-          <h2>Unable to load profile</h2>
+      <ClientLayout>
+        <div className="dashboard-error">
+          <div className="error-box">
+            <h2>Unable to load profile</h2>
 
-          <p>
-            We couldn't load your profile details.
-          </p>
+            <p>We couldn't load your profile details.</p>
 
-          <button
-            type="button"
-            onClick={() => navigate("/login")}
-          >
-            Go to Login
-          </button>
+            <button type="button" onClick={() => navigate("/login")}>Go to Login</button>
+          </div>
         </div>
-      </div>
+      </ClientLayout>
     );
   }
 
   const completion = calculateProfileCompletion();
 
   return (
-    <div className="client-dashboard">
+    <ClientLayout>
 
-      {/* =====================================================
-          MOBILE SIDEBAR OVERLAY
-      ===================================================== */}
-
-      {sidebarOpen && (
-        <div
-          className="sidebar-overlay"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* =====================================================
-          SIDEBAR
-      ===================================================== */}
-
-      <aside
-        className={`dashboard-sidebar ${
-          sidebarOpen ? "sidebar-open" : ""
-        }`}
-      >
-
-        {/* NO LOGO HERE */}
-
-        <nav className="sidebar-nav">
-
-          <p className="nav-heading">
-            MAIN MENU
-          </p>
-
-          <button
-            className="nav-item active"
-            onClick={() => {
-              navigate("/dashboard");
-              setSidebarOpen(false);
-            }}
-          >
-            <span className="nav-icon">▦</span>
-            <span>Dashboard</span>
-          </button>
-
-          <button
-            className="nav-item"
-            onClick={() => {
-              navigate("/profile");
-              setSidebarOpen(false);
-            }}
-          >
-            <span className="nav-icon">◎</span>
-            <span>My Profile</span>
-          </button>
-
-          <button
-            className="nav-item"
-            onClick={() => {
-              navigate("/search-matches");
-              setSidebarOpen(false);
-            }}
-          >
-            <span className="nav-icon">⌕</span>
-            <span>Search Matches</span>
-          </button>
-
-          <button
-            className="nav-item"
-            onClick={() => {
-              navigate("/interests");
-              setSidebarOpen(false);
-            }}
-          >
-            <span className="nav-icon">♡</span>
-            <span>Interests</span>
-          </button>
-
-          <button
-            className="nav-item"
-            onClick={() => {
-              navigate("/shortlist");
-              setSidebarOpen(false);
-            }}
-          >
-            <span className="nav-icon">☆</span>
-            <span>Shortlist</span>
-          </button>
-
-          <button
-            className="nav-item"
-            onClick={() => {
-              navigate("/messages");
-              setSidebarOpen(false);
-            }}
-          >
-            <span className="nav-icon">▱</span>
-            <span>Messages</span>
-          </button>
-
-          <p className="nav-heading second-heading">
-            ACCOUNT
-          </p>
-
-          <button
-            className="nav-item"
-            onClick={() => {
-              navigate("/photos");
-              setSidebarOpen(false);
-            }}
-          >
-            <span className="nav-icon">▧</span>
-            <span>My Photos</span>
-          </button>
-
-          <button
-            className="nav-item"
-            onClick={() => {
-              navigate("/settings");
-              setSidebarOpen(false);
-            }}
-          >
-            <span className="nav-icon">⚙</span>
-            <span>Settings</span>
-          </button>
-
-        </nav>
-
-        {/* SIDEBAR BOTTOM */}
-
-        <div className="sidebar-bottom">
-
-          <div className="help-card">
-
-            <div className="help-icon">
-              ?
-            </div>
-
-            <div>
-              <strong>Need Help?</strong>
-
-              <span>
-                Contact our team
-              </span>
-            </div>
-
-          </div>
-
-          <button
-            className="sidebar-logout"
-            onClick={handleLogout}
-          >
-            <span>↪</span>
-            Logout
-          </button>
-
-        </div>
-
-      </aside>
-
-      {/* =====================================================
-          MAIN AREA
-      ===================================================== */}
-
-      <div className="dashboard-main">
-
-        {/* MOBILE MENU BUTTON */}
-
-        <button
-          type="button"
-          className="dashboard-mobile-menu"
-          onClick={() => setSidebarOpen(true)}
-        >
-          ☰
-        </button>
-
-        {/* ===================================================
-            CONTENT
-        =================================================== */}
-
-        <main className="dashboard-content">
 
           {/* =================================================
               WELCOME
           ================================================= */}
 
-          <div className="welcome-section">
+          <div className="welcome-section dashboard-profile-banner">
 
             <div>
 
@@ -1018,10 +828,6 @@ export default function ClientDashboard() {
 
             )}
 
-        </main>
-
-      </div>
-
       {/* =====================================================
           LARGE PHOTO MODAL
       ===================================================== */}
@@ -1054,7 +860,7 @@ export default function ClientDashboard() {
 
       )}
 
-    </div>
+    </ClientLayout>
   );
 }
 

@@ -47,13 +47,22 @@
   object-fit: cover;
 }
 
+.profile-image-placeholder {
+  display: grid;
+  place-items: center;
+  color: #087442;
+  background: linear-gradient(135deg, #e5f5ec, #f7fbf8);
+  font-size: 72px;
+  font-weight: 700;
+}
+
 .profile-content {
   padding: 20px;
 }
 
 .profile-id {
   display: inline-block;
-  /* background: #8b0045; */
+  background: #087442;
   color: white;
   padding: 5px 12px;
   border-radius: 30px;

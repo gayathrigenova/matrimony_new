@@ -1,12 +1,13 @@
 import { API_URL } from "../../api.js";
-import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import ClientLayout from "../../components/ClientLayout";
 import "./MyProfile.css";
 
 
 export default function MyProfile() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -29,6 +30,7 @@ export default function MyProfile() {
         if (!res.ok) {
           if (res.status === 401) {
             localStorage.clear();
+            window.dispatchEvent(new Event("auth-change"));
             navigate("/login");
             return;
           }
@@ -91,6 +93,9 @@ export default function MyProfile() {
   return (
     <ClientLayout>
       <div className="my-profile-container">
+        {location.state?.success && (
+          <div className="alert-message success" role="status">{location.state.success}</div>
+        )}
         {/* HEADER CARD */}
         <div className="profile-header-card">
           <div className="profile-header-left">

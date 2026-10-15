@@ -10,6 +10,7 @@ from rest_framework.permissions import (
     IsAuthenticated,
 )
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -522,23 +523,41 @@ class MyProfileView(
 
     serializer_class = ClientProfileSerializer
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def update(self, request, *args, **kwargs):
+        """Create a first profile on save, or update the latest existing one."""
+        partial = kwargs.pop("partial", False)
+        registration = Registration.objects.filter(
+            user=request.user
+        ).order_by("-created_at", "-id").first()
+
+        if registration:
+            kwargs["partial"] = partial
+            return super().update(request, *args, **kwargs)
+
+        serializer = self.get_serializer(data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        registration = serializer.save(
+            user=request.user,
+            status=Registration.Status.PENDING,
+        )
+
+        from adminpanel.models import ProfileVerification
+
+        ProfileVerification.objects.get_or_create(
+            client=request.user,
+            defaults={"status": ProfileVerification.Status.PENDING},
+        )
+        return Response(self.get_serializer(registration).data)
 
     def get_object(self):
-
-        try:
-
-            return Registration.objects.get(
-                user=self.request.user
-            )
-
-        except Registration.DoesNotExist:
-
-            raise generics.NotFound(
-                detail=(
-                    "Profile registration "
-                    "not found for this account."
-                )
-            )
+        registration = Registration.objects.filter(
+            user=self.request.user
+        ).order_by("-created_at", "-id").first()
+        if registration is None:
+            raise NotFound(detail="Profile registration not found for this account.")
+        return registration
 
     def perform_update(self, serializer):
 
@@ -558,6 +577,7 @@ class MyProfileView(
             serializer.save(
                 status=Registration.Status.UNDER_REVIEW
             )
+            self._set_review_status(registration)
 
         # -------------------------------------------------
         # CORRECTION REQUIRED
@@ -571,10 +591,22 @@ class MyProfileView(
                 status=Registration.Status.UNDER_REVIEW,
                 correction_reason=""
             )
+            self._set_review_status(registration)
 
         else:
 
             serializer.save()
+
+    @staticmethod
+    def _set_review_status(registration):
+        from adminpanel.models import ProfileVerification
+
+        verification, _ = ProfileVerification.objects.get_or_create(
+            client=registration.user
+        )
+        verification.status = ProfileVerification.Status.UNDER_REVIEW
+        verification.correction_message = ""
+        verification.save(update_fields=["status", "correction_message", "updated_at"])
 
 
 # =========================================================
@@ -940,9 +972,11 @@ class ClientPhotoListView(APIView):
 
         try:
 
-            registration = Registration.objects.get(
+            registration = Registration.objects.filter(
                 user=request.user
-            )
+            ).order_by("-created_at", "-id").first()
+            if registration is None:
+                raise Registration.DoesNotExist
 
         except Registration.DoesNotExist:
 

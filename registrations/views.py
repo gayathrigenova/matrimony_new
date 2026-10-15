@@ -1,6 +1,12 @@
 from datetime import date
+import logging
+import mimetypes
+from django.http import FileResponse
+from PIL import Image, UnidentifiedImageError
 
+from django.db import transaction
 from django.db.models import Q
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from rest_framework import generics, status
@@ -34,6 +40,11 @@ from .serializers import (
     ConversationSerializer,
     MessageSerializer,
 )
+from adminpanel.models import ProfileChange, ProfileVerification
+from notifications.emailing import notify_admin_profile_change
+
+
+logger = logging.getLogger(__name__)
 
 
 # =========================================================
@@ -45,6 +56,20 @@ class RegistrationCreateView(generics.CreateAPIView):
     queryset = Registration.objects.all()
     serializer_class = RegistrationSerializer
     permission_classes = [AllowAny]
+
+
+class RegistrationAvailabilityView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        errors = {}
+        email = str(request.data.get("email", "")).strip().lower()
+        phone = str(request.data.get("phone", "")).strip()
+        if email and get_user_model().objects.filter(email__iexact=email).exists():
+            errors["email"] = "This email address is already registered. Please log in or use a different email address."
+        if phone and Registration.objects.filter(phone__iexact=phone).exists():
+            errors["phone"] = "This phone number is already registered. Please use a different number."
+        return Response({"available": not errors, "errors": errors})
 
 
 # =========================================================
@@ -554,10 +579,52 @@ class MyProfileView(
             Registration.Status.PUBLISHED,
             Registration.Status.APPROVED,
         ]:
-
-            serializer.save(
-                status=Registration.Status.UNDER_REVIEW
+            values = dict(serializer.validated_data)
+            files = {
+                key: values.pop(key)
+                for key in ("profile_photo", "identity_document", "additional_document")
+                if key in values
+            }
+            pending_data = {
+                key: value.isoformat() if hasattr(value, "isoformat") else value
+                for key, value in values.items()
+                if isinstance(value, (str, int, float, bool)) or value is None or hasattr(value, "isoformat")
+            }
+            change, _ = ProfileChange.objects.get_or_create(
+                registration=registration,
+                status=ProfileChange.Status.PENDING_REVIEW,
+                defaults={"user": self.request.user, "previous_status": old_status},
             )
+            change.user = self.request.user
+            changed = []
+            for key, value in pending_data.items():
+                old_value = getattr(registration, key, None)
+                old_value = old_value.isoformat() if hasattr(old_value, "isoformat") else old_value
+                if old_value != value:
+                    changed.append({"field_name": key, "old_value": old_value, "new_value": value})
+            change.pending_data = {**change.pending_data, **pending_data}
+            replaced_pending_files = []
+            for field, value in files.items():
+                previous_file = getattr(change, f"pending_{field}")
+                if previous_file:
+                    replaced_pending_files.append(previous_file)
+                setattr(change, f"pending_{field}", value)
+                changed.append({"field_name": field, "new_value": value.name})
+            changed_by_field = {item["field_name"]: item for item in change.changed_fields}
+            for item in changed:
+                old = changed_by_field.get(item["field_name"], {})
+                changed_by_field[item["field_name"]] = {**old, **item}
+            change.changed_fields = list(changed_by_field.values())
+            change.save()
+            for previous_file in replaced_pending_files:
+                transaction.on_commit(lambda file=previous_file: file.delete(save=False))
+
+            verification, _ = ProfileVerification.objects.get_or_create(client=self.request.user)
+            verification.status = ProfileVerification.Status.UNDER_REVIEW
+            verification.correction_message = ""
+            verification.rejection_reason = ""
+            verification.save(update_fields=["status", "correction_message", "rejection_reason", "updated_at"])
+            transaction.on_commit(lambda: notify_admin_profile_change(registration))
 
         # -------------------------------------------------
         # CORRECTION REQUIRED
@@ -573,8 +640,12 @@ class MyProfileView(
             )
 
         else:
-
             serializer.save()
+
+        if old_status not in [Registration.Status.PUBLISHED, Registration.Status.APPROVED]:
+            verification, _ = ProfileVerification.objects.get_or_create(client=self.request.user)
+            verification.status = ProfileVerification.Status.PENDING
+            verification.save(update_fields=["status", "updated_at"])
 
 
 # =========================================================
@@ -1088,6 +1159,15 @@ class ClientPhotoUploadView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        if photo_file.size > 5 * 1024 * 1024 or not photo_file.name.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
+            return Response({"detail": "Choose a JPG, PNG, or WebP image smaller than 5 MB."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            image = Image.open(photo_file)
+            image.verify()
+            photo_file.seek(0)
+        except (UnidentifiedImageError, OSError, ValueError, SyntaxError):
+            return Response({"detail": "The uploaded file is not a valid image."}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
 
             slot_index = int(slot_index)
@@ -1134,13 +1214,7 @@ class ClientPhotoUploadView(APIView):
             == Registration.Status.PUBLISHED
         ):
 
-            # Delete old pending file first
-            if client_photo.pending_photo:
-
-                client_photo.pending_photo.delete(
-                    save=False
-                )
-
+            old_pending_photo = client_photo.pending_photo
             client_photo.pending_photo = photo_file
 
             client_photo.status = (
@@ -1148,6 +1222,22 @@ class ClientPhotoUploadView(APIView):
             )
 
             client_photo.save()
+            if old_pending_photo:
+                old_pending_photo.delete(save=False)
+
+            change, _ = ProfileChange.objects.get_or_create(
+                registration=registration,
+                status=ProfileChange.Status.PENDING_REVIEW,
+                defaults={"user": request.user, "previous_status": registration.status},
+            )
+            change.user = request.user
+            if not any(item.get("field_name") == "gallery_photo" and item.get("slot_index") == slot_index for item in change.changed_fields):
+                change.changed_fields.append({"field_name": "gallery_photo", "slot_index": slot_index})
+            change.save()
+            verification, _ = ProfileVerification.objects.get_or_create(client=request.user)
+            verification.status = ProfileVerification.Status.UNDER_REVIEW
+            verification.save(update_fields=["status", "updated_at"])
+            transaction.on_commit(lambda: notify_admin_profile_change(registration))
 
             message = (
                 "New photo uploaded and sent for "
@@ -1367,6 +1457,40 @@ class ClientPhotoActionView(APIView):
             },
             status=status.HTTP_400_BAD_REQUEST
         )
+
+
+class PendingFileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, kind, pk):
+        if kind == "gallery-photo":
+            photo = ClientPhoto.objects.select_related("registration__user").filter(pk=pk).first()
+            owner = photo.registration.user if photo else None
+            file_field = photo.pending_photo if photo else None
+            filename = file_field.name if file_field else ""
+        elif kind in ("client-identity-document", "client-additional-document"):
+            registration = Registration.objects.select_related("user").filter(pk=pk).first()
+            owner = registration.user if registration else None
+            field_name = "identity_document" if "identity" in kind else "additional_document"
+            file_field = getattr(registration, field_name) if registration else None
+            filename = file_field.name if file_field else ""
+        else:
+            change = ProfileChange.objects.select_related("registration__user").filter(pk=pk).first()
+            owner = change.registration.user if change else None
+            field_name = {
+                "profile-photo": "pending_profile_photo",
+                "identity-document": "pending_identity_document",
+                "additional-document": "pending_additional_document",
+            }.get(kind)
+            file_field = getattr(change, field_name) if change and field_name else None
+            filename = file_field.name if file_field else ""
+
+        if not file_field or not filename:
+            return Response({"detail": "Pending file not found."}, status=status.HTTP_404_NOT_FOUND)
+        if request.user != owner and getattr(request.user, "role", None) != "ADMIN":
+            return Response({"detail": "You do not have access to this file."}, status=status.HTTP_403_FORBIDDEN)
+        content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+        return FileResponse(file_field.open("rb"), content_type=content_type)
 
     # =====================================================
     # DELETE PHOTO

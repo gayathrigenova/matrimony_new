@@ -51,6 +51,7 @@ export default function ClientLayout({ children }) {
             localStorage.removeItem("access_token");
             localStorage.removeItem("refresh_token");
             localStorage.removeItem("user");
+            window.dispatchEvent(new Event("auth-change"));
             navigate("/login");
             return;
           }
@@ -71,6 +72,7 @@ export default function ClientLayout({ children }) {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
     localStorage.removeItem("user");
+    window.dispatchEvent(new Event("auth-change"));
     navigate("/login");
   };
 

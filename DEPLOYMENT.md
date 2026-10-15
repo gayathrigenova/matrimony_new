@@ -1,31 +1,53 @@
 # Deployment
 
-## Backend on Railway
+## Railway backend
 
-Deploy the repository root as the Railway service root. Railway detects the
-Python dependencies from `requirements.txt` and starts the service with the
-command in `railway.toml`. That command applies migrations, collects Django
-static files, and starts Gunicorn.
+Deploy the repository root as the Railway service root. The `railway.toml`
+command applies migrations, collects static files, and starts Gunicorn. Set:
 
-Set these variables on the Railway web service:
+- `DJANGO_SECRET_KEY`: private production Django key.
+- `DJANGO_ALLOWED_HOSTS`: comma separated backend hosts.
+- `CORS_ALLOWED_ORIGINS`: comma separated frontend origins.
+- `CSRF_TRUSTED_ORIGINS`: comma separated origins including `https://`.
+- `MYSQLHOST`, `MYSQLPORT`, `MYSQLDATABASE`, `MYSQLUSER`, `MYSQLPASSWORD`:
+  Railway MySQL connection values.
+- `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`,
+  `EMAIL_USE_TLS`, `DEFAULT_FROM_EMAIL`: SMTP settings from your email provider.
+- `ADMIN_NOTIFICATION_EMAIL`: destination for profile review notices.
+- `ADMIN_DASHBOARD_URL`: frontend origin used for admin review links.
+- `FRONTEND_URL`: frontend origin used in client emails.
 
-- `DJANGO_SECRET_KEY`: a newly generated, private Django secret key.
-- `DJANGO_ALLOWED_HOSTS`: the Railway public hostname, without `https://`.
-- `CORS_ALLOWED_ORIGINS`: the frontend origin, such as
-  `https://matrimony-sepia-phi.vercel.app`.
-- `CSRF_TRUSTED_ORIGINS`: the frontend and backend origins, comma separated,
-  including `https://`.
-- `MYSQLHOST`, `MYSQLPORT`, `MYSQLDATABASE`, `MYSQLUSER`, `MYSQLPASSWORD`: use
-  the values exposed by the Railway MySQL service. Railway variable references
-  can connect these to the web service.
+Keep `DEBUG` false in production. Attach a Railway Volume to the backend at
+`/app/media`; Django uses `RAILWAY_VOLUME_MOUNT_PATH` for `MEDIA_ROOT`. Without
+a mounted volume, uploaded files can disappear on redeploy. Existing ephemeral
+uploads need to be copied to the volume or uploaded again. Public profile images
+are served under `/media/profiles/`; pending uploads use authenticated API URLs.
 
-Keep `DEBUG` unset or set it to `False` in production. The Railway proxy's
-forwarded HTTPS header and secure session/CSRF cookies are configured in Django.
+The deployment command runs database migrations before startup. Confirm that
+`adminpanel.0002_profilechange` succeeds in Railway deployment logs.
 
 ## Frontend
 
-This repository contains no frontend source or package/build manifest, so it
-cannot produce a frontend deployment. The existing frontend origin is
-configurable through `CORS_ALLOWED_ORIGINS` and `CSRF_TRUSTED_ORIGINS`. Deploy
-the frontend from its own source repository and set its API base URL to this
-backend's public URL.
+This repository contains the React/Vite app. Set `VITE_API_URL` to the Railway
+backend origin without `/api` before building. `src/api.js` appends `/api`.
+Redeploy the frontend after code changes.
+
+## Verification
+
+1. Deploy the backend and confirm migrations and Gunicorn start successfully.
+2. Upload profile and gallery images. Refresh the client pages and verify the
+   images load from the persistent media volume.
+3. Edit a published profile. Confirm the public data remains unchanged and the
+   admin dashboard lists the update under review.
+4. Approve the update. Confirm the changed profile and images are public and
+   the client receives the updated-profile email.
+5. Register a new profile, approve it, and publish it. Confirm the initial
+   approval email is sent after publication.
+6. Try correction and rejection. Confirm the client receives the admin's
+   message and rejected changes are not published.
+7. Confirm a client cannot open another client's pending file or call admin
+   approval endpoints.
+
+SMTP delivery requires valid provider credentials and a verified sender.
+Without those settings, production email errors are logged; the API action
+still succeeds after its database transaction commits.

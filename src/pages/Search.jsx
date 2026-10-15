@@ -96,7 +96,13 @@ export default function Search() {
             <a href="#">More Filters</a>
           </div>
 
-          <button className="search-submit-btn">Search</button>
+          <button
+            type="button"
+            className="search-submit-btn"
+            onClick={() => navigate("/profiles")}
+          >
+            Search
+          </button>
         </div>
       </div>
 

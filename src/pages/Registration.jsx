@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { API_URL, readApiResponse } from "../api.js";
 import "./Registration.css";
 
 export default function Registration() {
@@ -7,17 +8,22 @@ export default function Registration() {
   const location = useLocation();
 
   const prefill = location.state || {};
+  const previousFormData = prefill.step1FormData || {};
 
   const [formData, setFormData] = useState({
-    name: prefill.name || "",
-    gender: prefill.gender || "",
-    date_of_birth: "",
-    maritalStatus: "",
-    caste: "",
-    email: "",
-    password: "",
-    source: "",
+    name: previousFormData.name || prefill.name || prefill.registration?.full_name || "",
+    gender: previousFormData.gender || prefill.gender || prefill.registration?.gender || "",
+    date_of_birth: previousFormData.date_of_birth || "",
+    maritalStatus: previousFormData.maritalStatus || "",
+    caste: previousFormData.caste || "",
+    phone: previousFormData.phone || prefill.phone || prefill.registration?.phone || "",
+    email: previousFormData.email || prefill.registration?.email || "",
+    password: previousFormData.password || prefill.registration?.password || "",
+    confirmPassword: previousFormData.confirmPassword || prefill.registration?.password || "",
+    source: previousFormData.source || "",
   });
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [checkingEmail, setCheckingEmail] = useState(false);
 
   // =========================
   // HANDLE INPUT CHANGE
@@ -29,12 +35,13 @@ export default function Registration() {
       ...prev,
       [name]: value,
     }));
+    setFieldErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
   // =========================
   // HANDLE SUBMIT
   // =========================
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     // Validate DOB
@@ -42,6 +49,32 @@ export default function Registration() {
       alert("Please select your complete date of birth.");
       return;
     }
+    if (formData.password !== formData.confirmPassword) {
+      setFieldErrors((prev) => ({ ...prev, confirmPassword: "Passwords do not match." }));
+      return;
+    }
+
+    setCheckingEmail(true);
+    setFieldErrors((prev) => ({ ...prev, email: "" }));
+    try {
+      const response = await fetch(`${API_URL}/registrations/availability/`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: formData.email, phone: formData.phone }),
+      });
+      const result = await readApiResponse(response);
+      if (!response.ok) throw new Error(result.detail || "Could not verify the email and phone. Please try again.");
+      if (result.errors?.email) {
+        setFieldErrors((prev) => ({ ...prev, email: result.errors.email }));
+        return;
+      }
+      if (result.errors?.phone) {
+        setFieldErrors((prev) => ({ ...prev, phone: result.errors.phone }));
+        return;
+      }
+    } catch (error) {
+      setFieldErrors((prev) => ({ ...prev, email: error.message || "Could not verify this email. Please try again." }));
+      return;
+    } finally { setCheckingEmail(false); }
 
     // Registration data
     const registrationData = {
@@ -53,6 +86,7 @@ export default function Registration() {
       source: formData.source,
       email: formData.email.trim().toLowerCase(),
       password: formData.password,
+      phone: formData.phone.trim(),
     };
 
     console.log("Step 1 Data:", registrationData);
@@ -61,6 +95,7 @@ export default function Registration() {
     navigate("/registration-details", {
       state: {
         registration: registrationData,
+        step1FormData: formData,
       },
     });
   };
@@ -309,6 +344,19 @@ export default function Registration() {
 
             {/* EMAIL */}
             <div className="registration-form-group">
+              <label>Phone Number *</label>
+              <input
+                type="tel"
+                name="phone"
+                placeholder="Enter Mobile Number"
+                value={formData.phone}
+                onChange={handleChange}
+                required
+              />
+              {fieldErrors.phone && <small className="registration-field-error" role="alert">{fieldErrors.phone}</small>}
+            </div>
+
+            <div className="registration-form-group">
 
               <label>
                 User Email *
@@ -322,6 +370,7 @@ export default function Registration() {
                 onChange={handleChange}
                 required
               />
+              {fieldErrors.email && <small className="registration-field-error" role="alert">{fieldErrors.email}</small>}
 
             </div>
 
@@ -341,6 +390,19 @@ export default function Registration() {
                 required
               />
 
+            </div>
+
+            <div className="registration-form-group">
+              <label>Confirm Password *</label>
+              <input
+                type="password"
+                name="confirmPassword"
+                placeholder="Re-enter Password"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                required
+              />
+              {fieldErrors.confirmPassword && <small className="registration-field-error" role="alert">{fieldErrors.confirmPassword}</small>}
             </div>
 
             {/* =========================
@@ -396,8 +458,9 @@ export default function Registration() {
             <button
               type="submit"
               className="registration-submit-btn"
+              disabled={checkingEmail}
             >
-              ENTER
+              {checkingEmail ? "Checking..." : "ENTER"}
             </button>
 
           </form>

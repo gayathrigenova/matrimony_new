@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "./RegistrationDetails1.css";
 
@@ -8,7 +8,7 @@ export default function RegistrationDetails1() {
 
   const registration = location.state?.registration || null;
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(() => ({
     educationLevel: "",
     education: "",
     highestEducation: "",
@@ -19,7 +19,8 @@ export default function RegistrationDetails1() {
     workingPlace: "",
     height: "",
     disability: "No",
-  });
+    ...location.state?.step2FormData,
+  }));
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -78,6 +79,8 @@ export default function RegistrationDetails1() {
     navigate("/registration-details3", {
       state: {
         registration: updatedRegistration,
+        step1FormData: location.state?.step1FormData,
+        step2FormData: formData,
       },
     });
   };
@@ -308,6 +311,8 @@ export default function RegistrationDetails1() {
                     state: {
                       name: registration?.full_name || "",
                       gender: registration?.gender || "",
+                      registration,
+                      step1FormData: location.state?.step1FormData,
                     },
                   })
                 }

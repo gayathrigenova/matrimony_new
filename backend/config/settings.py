@@ -214,7 +214,11 @@ STORAGES = {
 # =========================================================
 
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = Path(
+    os.getenv("MEDIA_ROOT")
+    or os.getenv("RAILWAY_VOLUME_MOUNT_PATH")
+    or BASE_DIR / "media"
+)
 
 
 # =========================================================

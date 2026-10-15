@@ -244,9 +244,11 @@ REST_FRAMEWORK = {
 CORS_ALLOWED_ORIGINS = [
     origin.strip().rstrip("/") for origin in os.getenv(
         "CORS_ALLOWED_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173,https://matrimony-sepia-phi.vercel.app",
+        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,https://matrimony-sepia-phi.vercel.app",
     ).split(",") if origin.strip()
 ]
+if "http://localhost:5174" not in CORS_ALLOWED_ORIGINS:
+    CORS_ALLOWED_ORIGINS.append("http://localhost:5174")
 
 CORS_ALLOW_CREDENTIALS = True
 

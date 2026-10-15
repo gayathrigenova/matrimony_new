@@ -110,7 +110,7 @@ export default function Home() {
 
           <div className="hero-form-card">
             <div className="hero-form-header">
-              <h3>Find Your Partner From <span className="highlight-text">2 Lakh+</span> Profiles</h3>
+              <h3>Find Your Partner From Profiles</h3>
             </div>
             <form onSubmit={handleRegisterSubmit}>
               <div className="hero-form-row">

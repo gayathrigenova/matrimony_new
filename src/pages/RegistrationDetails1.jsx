@@ -2,6 +2,11 @@ import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "./RegistrationDetails1.css";
 
+const HEIGHT_OPTIONS = Array.from({ length: 37 }, (_, index) => {
+  const totalInches = 48 + index;
+  return `${Math.floor(totalInches / 12)}'${totalInches % 12}"`;
+});
+
 export default function RegistrationDetails1() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -275,15 +280,18 @@ export default function RegistrationDetails1() {
             <div className="rd1-field">
               <label htmlFor="height">Height <span>*</span></label>
 
-              <input
-                type="text"
+              <select
                 id="height"
                 name="height"
-                placeholder="Example: 5'5&quot;"
                 value={formData.height}
                 onChange={handleChange}
                 required
-              />
+              >
+                <option value="">Select Height</option>
+                {HEIGHT_OPTIONS.map((height) => (
+                  <option key={height} value={height}>{height}</option>
+                ))}
+              </select>
             </div>
 
             {/* Disability */}

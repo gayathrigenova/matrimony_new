@@ -3,6 +3,23 @@ import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "./RegistrationD3.css";
 
+const KERALA_DISTRICTS = [
+  "Thiruvananthapuram",
+  "Kollam",
+  "Pathanamthitta",
+  "Alappuzha",
+  "Kottayam",
+  "Idukki",
+  "Ernakulam",
+  "Thrissur",
+  "Palakkad",
+  "Malappuram",
+  "Kozhikode",
+  "Wayanad",
+  "Kannur",
+  "Kasaragod",
+];
+
 export default function RegistrationStep3() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -28,7 +45,7 @@ export default function RegistrationStep3() {
     houseName: "",
     busStop: "",
     postOffice: "",
-    taluk: "",
+    district: "",
     village: "",
 
     // Contact Details
@@ -104,7 +121,7 @@ export default function RegistrationStep3() {
       house_name: formData.houseName,
       bus_stop: formData.busStop,
       post_office: formData.postOffice,
-      taluk: formData.taluk,
+      district: formData.district,
       village: formData.village,
 
       // -------------------------
@@ -523,41 +540,22 @@ export default function RegistrationStep3() {
               />
             </div>
 
-            {/* Taluk */}
+            {/* District */}
             <div className="reg3-form-group">
               <label>
-                Taluk <span>*</span>
+                District <span>*</span>
               </label>
 
               <select
-                name="taluk"
-                value={formData.taluk}
+                name="district"
+                value={formData.district}
                 onChange={handleChange}
                 required
               >
-                <option value="">
-                  --SELECT--
-                </option>
-
-                <option value="Kozhikode">
-                  Kozhikode
-                </option>
-
-                <option value="Kannur">
-                  Kannur
-                </option>
-
-                <option value="Malappuram">
-                  Malappuram
-                </option>
-
-                <option value="Thrissur">
-                  Thrissur
-                </option>
-
-                <option value="Ernakulam">
-                  Ernakulam
-                </option>
+                <option value="">Select District</option>
+                {KERALA_DISTRICTS.map((district) => (
+                  <option key={district} value={district}>{district}</option>
+                ))}
               </select>
             </div>
 
@@ -567,28 +565,14 @@ export default function RegistrationStep3() {
                 Village <span>*</span>
               </label>
 
-              <select
+              <input
+                type="text"
                 name="village"
                 value={formData.village}
                 onChange={handleChange}
+                placeholder="Enter village"
                 required
-              >
-                <option value="">
-                  --SELECT--
-                </option>
-
-                <option value="Village 1">
-                  Village 1
-                </option>
-
-                <option value="Village 2">
-                  Village 2
-                </option>
-
-                <option value="Village 3">
-                  Village 3
-                </option>
-              </select>
+              />
             </div>
 
             <hr className="reg3-section-divider" />
@@ -644,25 +628,11 @@ export default function RegistrationStep3() {
                   onChange={handleChange}
                   required
                 >
-                  <option value="+91">
-                    India +91
-                  </option>
-
-                  <option value="+971">
-                    UAE +971
-                  </option>
-
-                  <option value="+966">
-                    Saudi Arabia +966
-                  </option>
-
-                  <option value="+1">
-                    USA +1
-                  </option>
-
-                  <option value="+44">
-                    UK +44
-                  </option>
+                  <option value="+91">+91</option>
+                  <option value="+971">+971</option>
+                  <option value="+966">+966</option>
+                  <option value="+1">+1</option>
+                  <option value="+44">+44</option>
                 </select>
 
                 <input

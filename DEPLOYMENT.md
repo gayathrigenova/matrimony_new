@@ -2,11 +2,11 @@
 
 ## Railway backend
 
-Deploy the repository root as the Railway service root. Nixpacks builds the
-Vite frontend and verifies that every JS/CSS URL in `dist/index.html` exists
-under `dist/assets/` before collecting Django static files. Railway starts the
-service only after that build succeeds; the start command applies migrations
-and starts Gunicorn. Set:
+Deploy the repository root as the Railway service root. Railpack uses Node.js 24
+and Python 3.12 to build the Vite frontend, verify that every JS/CSS URL in
+`dist/index.html` exists under `dist/assets/`, and collect Django static files.
+Railway starts the service only after that build succeeds; the start command
+applies migrations and starts Gunicorn. Set:
 
 - `DJANGO_SECRET_KEY`: private production Django key.
 - `DJANGO_ALLOWED_HOSTS`: comma separated backend hosts.

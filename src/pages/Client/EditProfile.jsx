@@ -621,7 +621,7 @@ function FileField({ label, name, accept, uploads, setUploads, onChange }) {
   return (
     <div className="form-group">
       <label htmlFor={name}>{label}</label>
-      <input id={name} type="file" accept={accept} onChange={onChange || ((event) => setUploads((current) => ({ ...current, [name]: event.target.files?.[0] || null })))} />
+      <input id={name} name={name} type="file" accept={accept} onChange={onChange || ((event) => setUploads((current) => ({ ...current, [name]: event.target.files?.[0] || null })))} />
       {uploads[name] && <small>{uploads[name].name}</small>}
     </div>
   );

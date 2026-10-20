@@ -37,10 +37,9 @@ export default function Profiles() {
             <div className="profile-content">
               <span className="profile-id">{profile.matrimony_id || "Verified profile"}</span>
               <h3>{profile.full_name}</h3>
-              {profile.age ? <p>{profile.age} Years</p> : null}
-              <p>{profile.religion}</p>
-              <p>{profile.occupation || profile.education}</p>
-              <p>{[profile.city, profile.district, profile.state].filter(Boolean).join(", ")}</p>
+              {profile.age ? <p><strong>Age:</strong> {profile.age} years</p> : null}
+              {profile.occupation ? <p><strong>Job:</strong> {profile.occupation}</p> : null}
+              {profile.state ? <p><strong>State:</strong> {profile.state}</p> : null}
               <Link to={`/profiles/${profile.id}`} className="view-btn">View Profile</Link>
             </div>
           </article>

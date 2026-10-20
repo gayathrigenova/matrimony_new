@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -307,7 +309,18 @@ EMAIL_HOST = os.getenv("EMAIL_HOST", "")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
-EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() == "true"
+EMAIL_USE_TLS = os.getenv(
+    "EMAIL_USE_TLS",
+    "false" if EMAIL_PORT == 465 else "true",
+).lower() == "true"
+EMAIL_USE_SSL = os.getenv(
+    "EMAIL_USE_SSL",
+    "true" if EMAIL_PORT == 465 else "false",
+).lower() == "true"
+if EMAIL_USE_TLS and EMAIL_USE_SSL:
+    raise ImproperlyConfigured(
+        "EMAIL_USE_TLS and EMAIL_USE_SSL cannot both be enabled."
+    )
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "webmaster@localhost")
 EMAIL_BACKEND = (
     "django.core.mail.backends.smtp.EmailBackend"

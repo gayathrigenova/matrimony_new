@@ -16,6 +16,7 @@ from rest_framework.permissions import (
     IsAuthenticated,
 )
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -558,7 +559,7 @@ class MyProfileView(
 
         except Registration.DoesNotExist:
 
-            raise generics.NotFound(
+            raise NotFound(
                 detail=(
                     "Profile registration "
                     "not found for this account."
@@ -1458,11 +1459,120 @@ class ClientPhotoActionView(APIView):
             status=status.HTTP_400_BAD_REQUEST
         )
 
+    def delete(self, request, slot_index, action):
+        if action != "delete":
+            return Response(
+                {"detail": "Invalid photo action."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            registration = Registration.objects.get(user=request.user)
+        except Registration.DoesNotExist:
+            return Response(
+                {"detail": "Registration profile not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        client_photo = ClientPhoto.objects.filter(
+            registration=registration,
+            slot_index=slot_index,
+        ).first()
+        if not client_photo:
+            if slot_index == 1 and registration.profile_photo:
+                registration.profile_photo.delete(save=False)
+                next_photo = (
+                    ClientPhoto.objects.filter(
+                        registration=registration,
+                        status=ClientPhoto.Status.APPROVED,
+                    )
+                    .exclude(photo="")
+                    .order_by("slot_index")
+                    .first()
+                )
+                ClientPhoto.objects.filter(registration=registration).update(is_main=False)
+                if next_photo:
+                    next_photo.is_main = True
+                    next_photo.save(update_fields=["is_main", "updated_at"])
+                    registration.profile_photo = next_photo.photo
+                else:
+                    registration.profile_photo = None
+                registration.save(update_fields=["profile_photo", "updated_at"])
+                return Response(
+                    {"message": "Photo deleted successfully.", "slot_index": slot_index},
+                    status=status.HTTP_200_OK,
+                )
+            return Response(
+                {"detail": "Photo not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        removed_main_photo = bool(
+            client_photo.photo and (client_photo.is_main or slot_index == 1)
+        )
+        if client_photo.photo:
+            client_photo.photo.delete(save=False)
+        if client_photo.pending_photo:
+            client_photo.pending_photo.delete(save=False)
+        client_photo.delete()
+
+        if removed_main_photo:
+            next_photo = (
+                ClientPhoto.objects.filter(
+                    registration=registration,
+                    status=ClientPhoto.Status.APPROVED,
+                )
+                .exclude(photo="")
+                .order_by("slot_index")
+                .first()
+            )
+            ClientPhoto.objects.filter(registration=registration).update(is_main=False)
+            if next_photo:
+                next_photo.is_main = True
+                next_photo.save(update_fields=["is_main", "updated_at"])
+                registration.profile_photo = next_photo.photo
+            else:
+                registration.profile_photo = None
+            registration.save(update_fields=["profile_photo", "updated_at"])
+
+        return Response(
+            {
+                "message": "Photo deleted successfully.",
+                "slot_index": slot_index,
+            },
+            status=status.HTTP_200_OK,
+        )
+
 
 class PendingFileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, kind, pk):
+        try:
+            return self._get_pending_file(request, kind, pk)
+        except FileNotFoundError:
+            logger.exception(
+                "Pending file is missing from storage (kind=%s, object_id=%s)",
+                kind,
+                pk,
+            )
+            return Response(
+                {"detail": "Pending file not found.", "code": "pending_file_not_found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except Exception:
+            logger.exception(
+                "Pending file retrieval failed (kind=%s, object_id=%s, user_id=%s)",
+                kind,
+                pk,
+                request.user.pk,
+            )
+            return Response(
+                {"detail": "Pending file could not be retrieved.", "code": "pending_file_error"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    def _get_pending_file(self, request, kind, pk):
         if kind == "gallery-photo":
             photo = ClientPhoto.objects.select_related("registration__user").filter(pk=pk).first()
             owner = photo.registration.user if photo else None
@@ -1485,177 +1595,15 @@ class PendingFileView(APIView):
             file_field = getattr(change, field_name) if change and field_name else None
             filename = file_field.name if file_field else ""
 
-        if not file_field or not filename:
-            return Response({"detail": "Pending file not found."}, status=status.HTTP_404_NOT_FOUND)
-        if request.user != owner and getattr(request.user, "role", None) != "ADMIN":
+        if owner and request.user != owner and getattr(request.user, "role", None) != "ADMIN":
             return Response({"detail": "You do not have access to this file."}, status=status.HTTP_403_FORBIDDEN)
+        if not file_field or not filename:
+            return Response(
+                {"detail": "Pending file not found.", "code": "pending_file_not_found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
         return FileResponse(file_field.open("rb"), content_type=content_type)
-
-    # =====================================================
-    # DELETE PHOTO
-    # =====================================================
-
-    def delete(
-        self,
-        request,
-        slot_index,
-        action=None
-    ):
-
-        if action != "delete":
-
-            return Response(
-                {
-                    "detail": (
-                        "Invalid photo action."
-                    )
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        try:
-
-            registration = Registration.objects.get(
-                user=request.user
-            )
-
-        except Registration.DoesNotExist:
-
-            return Response(
-                {
-                    "detail": (
-                        "Registration profile not found."
-                    )
-                },
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        # -------------------------------------------------
-        # FIND PHOTO
-        # -------------------------------------------------
-
-        client_photo = (
-            ClientPhoto.objects.filter(
-                registration=registration,
-                slot_index=slot_index
-            ).first()
-        )
-
-        if not client_photo:
-
-            return Response(
-                {
-                    "detail": "Photo not found."
-                },
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-        # -------------------------------------------------
-        # CHECK MAIN
-        # -------------------------------------------------
-
-        was_main = (
-            client_photo.is_main
-            or slot_index == 1
-        )
-
-        # -------------------------------------------------
-        # DELETE ACTUAL IMAGE FILE
-        # -------------------------------------------------
-
-        if client_photo.photo:
-
-            client_photo.photo.delete(
-                save=False
-            )
-
-        # -------------------------------------------------
-        # DELETE PENDING IMAGE FILE
-        # -------------------------------------------------
-
-        if client_photo.pending_photo:
-
-            client_photo.pending_photo.delete(
-                save=False
-            )
-
-        # -------------------------------------------------
-        # DELETE DATABASE RECORD
-        # -------------------------------------------------
-
-        client_photo.delete()
-
-        # -------------------------------------------------
-        # IF MAIN PHOTO WAS DELETED
-        # -------------------------------------------------
-
-        if was_main:
-
-            registration.profile_photo = None
-
-            registration.save(
-                update_fields=[
-                    "profile_photo",
-                    "updated_at",
-                ]
-            )
-
-            # -------------------------------------------------
-            # FIND ANOTHER APPROVED PHOTO
-            # -------------------------------------------------
-
-            next_photo = (
-                ClientPhoto.objects.filter(
-                    registration=registration,
-                    status=ClientPhoto.Status.APPROVED
-                )
-                .exclude(photo="")
-                .order_by("slot_index")
-                .first()
-            )
-
-            if next_photo:
-
-                # Remove main from all
-                ClientPhoto.objects.filter(
-                    registration=registration
-                ).update(
-                    is_main=False
-                )
-
-                # Make next photo main
-                next_photo.is_main = True
-
-                next_photo.save(
-                    update_fields=[
-                        "is_main",
-                        "updated_at",
-                    ]
-                )
-
-                # Update registration photo
-                registration.profile_photo = (
-                    next_photo.photo
-                )
-
-                registration.save(
-                    update_fields=[
-                        "profile_photo",
-                        "updated_at",
-                    ]
-                )
-
-        return Response(
-            {
-                "message": (
-                    "Photo deleted successfully."
-                ),
-                "slot_index": slot_index,
-            },
-            status=status.HTTP_200_OK
-        )
-
 
 # =========================================================
 # CLIENT - CONVERSATIONS LIST

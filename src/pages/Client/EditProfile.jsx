@@ -1,4 +1,4 @@
-import { API_URL } from "../../api.js";
+import { API_URL, fetchWithTokenRefresh as fetchAuthenticatedRequest } from "../../api.js";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ClientLayout from "../../components/ClientLayout";
@@ -11,6 +11,7 @@ export default function EditProfile() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [processingPhoto, setProcessingPhoto] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
   const [profilePhotoFailed, setProfilePhotoFailed] = useState(false);
   const [profilePhotoPreview, setProfilePhotoPreview] = useState("");
@@ -77,17 +78,16 @@ export default function EditProfile() {
       return;
     }
 
-    fetch(`${API_URL}/registrations/my-profile/`, {
+    fetchWithTokenRefresh(`${API_URL}/registrations/my-profile/`, {
       method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
     })
       .then(async (res) => {
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           if (res.status === 401) {
-            localStorage.clear();
+            localStorage.removeItem("access_token");
+            localStorage.removeItem("refresh_token");
+            localStorage.removeItem("user");
             window.dispatchEvent(new Event("auth-change"));
             navigate("/login");
             return;
@@ -176,13 +176,35 @@ export default function EditProfile() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleUploadSelected = (event) => {
+  const handleUploadSelected = async (event) => {
     const { name, files } = event.target;
-    const file = files?.[0] || null;
-    setUploads((current) => ({ ...current, [name]: file }));
-    if (name === "profile_photo") {
-      setProfilePhotoPreview(file ? URL.createObjectURL(file) : "");
-      setProfilePhotoFailed(false);
+    const selectedFile = files?.[0] || null;
+    event.target.value = "";
+    if (!selectedFile) return;
+
+    setMessage({ type: "", text: "" });
+    if (name === "profile_photo") setProcessingPhoto(true);
+    try {
+      const file = name === "profile_photo"
+        ? await prepareProfilePhoto(selectedFile)
+        : selectedFile;
+      setUploads((current) => ({ ...current, [name]: file }));
+      if (name === "profile_photo") {
+        setProfilePhotoPreview(URL.createObjectURL(file));
+        setProfilePhotoFailed(false);
+        setMessage({
+          type: "success",
+          text: file !== selectedFile
+            ? "Large profile photo optimized and ready to upload."
+            : "Profile photo ready to upload.",
+        });
+      }
+    } catch (error) {
+      setUploads((current) => ({ ...current, [name]: null }));
+      if (name === "profile_photo") setProfilePhotoPreview("");
+      setMessage({ type: "error", text: error.message || "Unable to prepare this image for upload." });
+    } finally {
+      if (name === "profile_photo") setProcessingPhoto(false);
     }
   };
 
@@ -553,8 +575,8 @@ export default function EditProfile() {
               >
                 Cancel
               </button>
-              <button type="submit" className="btn-save" disabled={saving} aria-busy={saving}>
-                {saving ? (uploads.profile_photo ? "Uploading image and saving..." : "Saving Changes...") : "Save Changes"}
+              <button type="submit" className="btn-save" disabled={saving || processingPhoto} aria-busy={saving || processingPhoto}>
+                {processingPhoto ? "Optimizing photo..." : saving ? (uploads.profile_photo ? "Uploading image and saving..." : "Saving Changes...") : "Save Changes"}
               </button>
             </div>
           </div>
@@ -576,40 +598,25 @@ async function readApiResponse(response) {
 }
 
 async function fetchWithTokenRefresh(url, options) {
-  const accessToken = localStorage.getItem("access_token");
-  const sendRequest = (token) => fetch(url, {
-    ...options,
-    headers: {
-      ...options.headers,
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
-
-  let response = await sendRequest(accessToken);
-  if (response.status !== 401) return response;
-
-  const refreshToken = localStorage.getItem("refresh_token");
-  if (!refreshToken) return response;
-
-  const refreshResponse = await fetch(`${API_URL}/accounts/token/refresh/`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh: refreshToken }),
-  });
-  const refreshed = await readApiResponse(refreshResponse);
-  if (!refreshResponse.ok || !refreshed?.access) {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    return response;
-  }
-
-  localStorage.setItem("access_token", refreshed.access);
-  return sendRequest(refreshed.access);
+  return fetchAuthenticatedRequest(url, options);
 }
 
 function getApiErrorMessage(result, status) {
   if (result?.detail) return result.detail;
   if (result?.message) return result.message;
+  if (result && typeof result === "object" && !result.nonJsonResponse) {
+    const fieldErrors = Object.entries(result)
+      .map(([field, errors]) => {
+        const messages = Array.isArray(errors) ? errors : [errors];
+        const readable = messages
+          .map((error) => typeof error === "string" ? error : error?.message)
+          .filter(Boolean)
+          .join(" ");
+        return readable ? `${field.replaceAll("_", " ")}: ${readable}` : "";
+      })
+      .filter(Boolean);
+    if (fieldErrors.length) return fieldErrors.join(" ");
+  }
   if (result?.nonJsonResponse) {
     if (status === 413) return "The uploaded file is too large. Choose a smaller image or document and try again.";
     return `The server returned an unexpected response (HTTP ${status}). Your changes may not have been saved; please try again.`;
@@ -625,4 +632,59 @@ function FileField({ label, name, accept, uploads, setUploads, onChange }) {
       {uploads[name] && <small>{uploads[name].name}</small>}
     </div>
   );
+}
+
+const MAX_PROFILE_PHOTO_BYTES = 5 * 1024 * 1024;
+const TARGET_PROFILE_PHOTO_BYTES = 4.5 * 1024 * 1024;
+const MAX_PROFILE_PHOTO_DIMENSION = 2048;
+
+async function prepareProfilePhoto(file) {
+  if (!file.type.startsWith("image/")) {
+    throw new Error("Choose a valid image for the profile photo.");
+  }
+  if (file.size <= MAX_PROFILE_PHOTO_BYTES) return file;
+
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    throw new Error("This image could not be opened. Try saving it as JPG, PNG, or WebP and selecting it again.");
+  }
+
+  try {
+    let scale = Math.min(
+      1,
+      MAX_PROFILE_PHOTO_DIMENSION / Math.max(bitmap.width, bitmap.height),
+    );
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Your browser cannot optimize this image.");
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+      const compressed = await new Promise((resolve, reject) => {
+        canvas.toBlob(
+          (blob) => blob ? resolve(blob) : reject(new Error("The image could not be compressed.")),
+          "image/jpeg",
+          Math.max(0.5, 0.86 - attempt * 0.06),
+        );
+      });
+      if (compressed.size <= TARGET_PROFILE_PHOTO_BYTES) {
+        const filename = file.name.replace(/\.[^.]+$/, "") || "profile-photo";
+        return new File([compressed], `${filename}.jpg`, {
+          type: "image/jpeg",
+          lastModified: file.lastModified,
+        });
+      }
+      scale *= 0.8;
+    }
+  } finally {
+    bitmap.close();
+  }
+
+  throw new Error("This photo could not be reduced enough to upload. Please choose a smaller image.");
 }

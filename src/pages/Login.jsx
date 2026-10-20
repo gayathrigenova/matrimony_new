@@ -1,5 +1,5 @@
 import { API_URL } from "../api.js";
-import React, { useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Login.css";
 
@@ -15,6 +15,9 @@ export default function Login() {
     e.preventDefault();
 
     setLoading(true);
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("admin_user");
 
     try {
       const response = await fetch(
@@ -32,8 +35,6 @@ export default function Login() {
       );
 
       const data = await response.json();
-
-      console.log("Login response:", data);
 
       if (!response.ok) {
         alert(data.detail || "Invalid email or password");

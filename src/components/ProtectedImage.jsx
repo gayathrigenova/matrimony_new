@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { fetchWithTokenRefresh } from "../api.js";
 
 export default function ProtectedImage({ src, alt, className, style }) {
   const [blobUrl, setBlobUrl] = useState("");
@@ -8,11 +9,9 @@ export default function ProtectedImage({ src, alt, className, style }) {
     if (!src) return undefined;
     let objectUrl = "";
     let active = true;
-    fetch(src, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("access_token") || ""}` },
-    })
+    fetchWithTokenRefresh(src)
       .then((response) => {
-        if (!response.ok) throw new Error("Image unavailable");
+        if (!response.ok) throw new Error(`Image unavailable (HTTP ${response.status}).`);
         return response.blob();
       })
       .then((blob) => {
@@ -31,6 +30,7 @@ export default function ProtectedImage({ src, alt, className, style }) {
     };
   }, [src]);
 
-  if (failed || !blobUrl) return null;
+  if (failed) return <span role="status">Image unavailable</span>;
+  if (!blobUrl) return null;
   return <img src={blobUrl} alt={alt} className={className} style={style} />;
 }

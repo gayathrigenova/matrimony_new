@@ -1,37 +1,47 @@
-import { API_URL } from "../../api.js";
+import { API_URL, fetchWithTokenRefresh, readApiResponse } from "../../api.js";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ClientLayout from "../../components/ClientLayout";
 import ProtectedImage from "../../components/ProtectedImage";
 import "./MyPhotos.css";
 
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
+function errorMessage(data, statusCode) {
+  return data?.detail || data?.message || `Request failed (HTTP ${statusCode}).`;
+}
 
 export default function MyPhotos() {
   const navigate = useNavigate();
   const [photoSlots, setPhotoSlots] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [uploadingSlot, setUploadingSlot] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(null);
+  const [workingSlot, setWorkingSlot] = useState(null);
   const [message, setMessage] = useState({ type: "", text: "" });
 
   const token = localStorage.getItem("access_token");
 
-  const fetchPhotos = useCallback(() => {
+  const fetchPhotos = useCallback(async () => {
     setLoading(true);
-    fetch(`${API_URL}/registrations/photos/`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(async (res) => {
-        if (!res.ok) throw new Error("Unable to load photos.");
-        return res.json();
-      })
-      .then((data) => {
-        setPhotoSlots(data || []);
-      })
-      .catch((err) => {
-        setMessage({ type: "error", text: err.message });
-      })
-      .finally(() => setLoading(false));
-  }, [token]);
+    try {
+      const response = await fetchWithTokenRefresh(`${API_URL}/registrations/photos/`);
+      const data = await readApiResponse(response);
+      if (!response.ok) {
+        if (response.status === 401) {
+          navigate("/login");
+          return false;
+        }
+        throw new Error(errorMessage(data, response.status));
+      }
+      setPhotoSlots(Array.isArray(data) ? data : []);
+      return true;
+    } catch (error) {
+      setMessage({ type: "error", text: error.message || "Unable to load your saved photos." });
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [navigate]);
 
   useEffect(() => {
     if (!token) {
@@ -42,75 +52,106 @@ export default function MyPhotos() {
     return () => clearTimeout(timer);
   }, [token, navigate, fetchPhotos]);
 
-  const handleFileUpload = (e, slotIndex) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      alert("Please select a valid image file.");
+  const uploadFiles = async (files, slotIndices) => {
+    if (!files.length) return;
+    if (files.some((file) => !file.type.startsWith("image/"))) {
+      setMessage({ type: "error", text: "Choose image files only." });
+      return;
+    }
+    if (files.some((file) => file.size > MAX_FILE_SIZE)) {
+      setMessage({ type: "error", text: "Each image must be smaller than 5 MB." });
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert("Image size must be less than 5 MB.");
+    setMessage({ type: "", text: "" });
+    setUploadProgress({ completed: 0, total: files.length });
+    let completed = 0;
+
+    try {
+      for (let index = 0; index < files.length; index += 1) {
+        const formData = new FormData();
+        formData.append("slot_index", String(slotIndices[index]));
+        formData.append("photo", files[index]);
+
+        const response = await fetchWithTokenRefresh(`${API_URL}/registrations/photos/upload/`, {
+          method: "POST",
+          body: formData,
+        });
+        const data = await readApiResponse(response);
+        if (!response.ok) throw new Error(errorMessage(data, response.status));
+
+        if (data?.photo) {
+          setPhotoSlots((current) => current.map((slot) => (
+            slot.slot_index === data.photo.slot_index ? data.photo : slot
+          )));
+        }
+        completed += 1;
+        setUploadProgress({ completed, total: files.length });
+      }
+
+      await fetchPhotos();
+      setMessage({
+        type: "success",
+        text: `${completed} photo${completed === 1 ? "" : "s"} uploaded successfully. Published-profile changes are shown as pending until admin review.`,
+      });
+    } catch (error) {
+      if (completed > 0) await fetchPhotos();
+      setMessage({
+        type: "error",
+        text: completed
+          ? `Uploaded ${completed} of ${files.length} photos. The next upload failed: ${error.message}`
+          : error.message || "Photo upload failed.",
+      });
+    } finally {
+      setUploadProgress(null);
+    }
+  };
+
+  const handleFileUpload = (event, slotIndex) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (file) uploadFiles([file], [slotIndex]);
+  };
+
+  const handleMultipleUpload = (event) => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = "";
+    if (!files.length) return;
+
+    const emptySlots = photoSlots
+      .filter((slot) => !slot.photo_url && !slot.pending_photo_url)
+      .map((slot) => slot.slot_index);
+    if (files.length > emptySlots.length) {
+      setMessage({
+        type: "error",
+        text: `Only ${emptySlots.length} empty slot${emptySlots.length === 1 ? " is" : "s are"} available. Remove or replace a photo before adding more.`,
+      });
       return;
     }
-
-    setUploadingSlot(slotIndex);
-    setMessage({ type: "", text: "" });
-
-    const formData = new FormData();
-    formData.append("slot_index", slotIndex);
-    formData.append("photo", file);
-
-    fetch(`${API_URL}/registrations/photos/upload/`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: formData,
-    })
-      .then(async (res) => {
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || "Photo upload failed.");
-        setMessage({ type: "success", text: data.message || "Photo uploaded successfully." });
-        fetchPhotos();
-      })
-      .catch((err) => {
-        setMessage({ type: "error", text: err.message });
-      })
-      .finally(() => setUploadingSlot(null));
+    uploadFiles(files, emptySlots.slice(0, files.length));
   };
 
-  const handleSetMain = (slotIndex) => {
+  const handlePhotoAction = async (slotIndex, action) => {
+    if (action === "delete" && !window.confirm("Are you sure you want to delete this photo?")) return;
+    setWorkingSlot(slotIndex);
     setMessage({ type: "", text: "" });
-    fetch(`${API_URL}/registrations/photos/${slotIndex}/set-main/`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(async (res) => {
-        if (!res.ok) throw new Error("Failed to set main photo.");
-        setMessage({ type: "success", text: "Main photo updated successfully." });
-        fetchPhotos();
-      })
-      .catch((err) => setMessage({ type: "error", text: err.message }));
+    try {
+      const response = await fetchWithTokenRefresh(
+        `${API_URL}/registrations/photos/${slotIndex}/${action}/`,
+        { method: action === "delete" ? "DELETE" : "POST" },
+      );
+      const data = await readApiResponse(response);
+      if (!response.ok) throw new Error(errorMessage(data, response.status));
+      await fetchPhotos();
+      setMessage({ type: "success", text: data?.message || (action === "delete" ? "Photo deleted successfully." : "Main photo updated successfully.") });
+    } catch (error) {
+      setMessage({ type: "error", text: error.message || `Unable to ${action} photo.` });
+    } finally {
+      setWorkingSlot(null);
+    }
   };
 
-  const handleDelete = (slotIndex) => {
-    if (!window.confirm("Are you sure you want to delete this photo?")) return;
-    setMessage({ type: "", text: "" });
-
-    fetch(`${API_URL}/registrations/photos/${slotIndex}/delete/`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(async (res) => {
-        if (!res.ok) throw new Error("Failed to delete photo.");
-        setMessage({ type: "success", text: "Photo deleted successfully." });
-        fetchPhotos();
-      })
-      .catch((err) => setMessage({ type: "error", text: err.message }));
-  };
+  const availableSlots = photoSlots.filter((slot) => !slot.photo_url && !slot.pending_photo_url).length;
 
   return (
     <ClientLayout>
@@ -130,10 +171,31 @@ export default function MyPhotos() {
         </div>
 
         {message.text && (
-          <div className={`alert-message ${message.type}`} style={{ marginBottom: "20px" }}>
+          <div className={`alert-message ${message.type}`} role={message.type === "error" ? "alert" : "status"} style={{ marginBottom: "20px" }}>
             {message.text}
           </div>
         )}
+
+        <div className="gallery-batch-upload">
+          <label className="btn-upload-label">
+            Add multiple photos ({availableSlots} slots available)
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              style={{ display: "none" }}
+              onChange={handleMultipleUpload}
+              disabled={Boolean(uploadProgress) || availableSlots === 0}
+            />
+          </label>
+          {uploadProgress && (
+            <span role="status">
+              {uploadProgress.completed === uploadProgress.total
+                ? "Finishing uploads..."
+                : `Uploading photo ${uploadProgress.completed + 1} of ${uploadProgress.total}...`}
+            </span>
+          )}
+        </div>
 
         {loading ? (
           <div className="dashboard-loading">
@@ -144,6 +206,7 @@ export default function MyPhotos() {
           <div className="photos-grid">
             {photoSlots.map((slot) => {
               const displayPhoto = slot.pending_photo_url || slot.photo_url;
+              const busy = Boolean(uploadProgress) || workingSlot === slot.slot_index;
               return (
                 <div key={slot.slot_index} className="photo-slot-card">
                   <div className="photo-slot-header">
@@ -162,9 +225,7 @@ export default function MyPhotos() {
                           <img src={displayPhoto} alt={`Slot ${slot.slot_index}`} />
                         )}
                         {(slot.pending_photo_url || slot.status === "PENDING") && (
-                          <div className="pending-photo-overlay">
-                            ⏳ Pending Admin Verification
-                          </div>
+                          <div className="pending-photo-overlay">⏳ Pending Admin Verification</div>
                         )}
                       </>
                     ) : (
@@ -177,8 +238,8 @@ export default function MyPhotos() {
 
                   <div className="photo-slot-actions">
                     <label className="btn-upload-label">
-                      {uploadingSlot === slot.slot_index
-                        ? "Uploading..."
+                      {uploadProgress
+                        ? `Uploading ${uploadProgress.completed}/${uploadProgress.total}...`
                         : displayPhoto
                         ? "Replace Photo"
                         : "Upload Photo"}
@@ -186,8 +247,8 @@ export default function MyPhotos() {
                         type="file"
                         accept="image/*"
                         style={{ display: "none" }}
-                        onChange={(e) => handleFileUpload(e, slot.slot_index)}
-                        disabled={uploadingSlot === slot.slot_index}
+                        onChange={(event) => handleFileUpload(event, slot.slot_index)}
+                        disabled={busy}
                       />
                     </label>
 
@@ -196,14 +257,16 @@ export default function MyPhotos() {
                         {!slot.is_main && slot.photo_url && (
                           <button
                             className="btn-slot-action"
-                            onClick={() => handleSetMain(slot.slot_index)}
+                            onClick={() => handlePhotoAction(slot.slot_index, "set-main")}
+                            disabled={busy}
                           >
                             Set Main
                           </button>
                         )}
                         <button
                           className="btn-slot-action delete"
-                          onClick={() => handleDelete(slot.slot_index)}
+                          onClick={() => handlePhotoAction(slot.slot_index, "delete")}
+                          disabled={busy}
                         >
                           Delete
                         </button>

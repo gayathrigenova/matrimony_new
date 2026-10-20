@@ -1,5 +1,5 @@
-import { API_URL } from "../api.js";
-import React, { useEffect, useState } from "react";
+import { API_URL, fetchWithTokenRefresh, readApiResponse } from "../api.js";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./ClientDashboard.css";
 import ClientLayout from "../components/ClientLayout";
@@ -10,6 +10,7 @@ export default function ClientDashboard() {
 
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [profileError, setProfileError] = useState("");
 
   const [photos, setPhotos] = useState([
     null,
@@ -32,15 +33,10 @@ export default function ClientDashboard() {
       return;
     }
 
-    fetch(`${API_URL}/registrations/my-profile/`, {
+    fetchWithTokenRefresh(`${API_URL}/registrations/my-profile/`, {
       method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
     })
       .then(async (response) => {
-        const data = await response.json();
-
         if (!response.ok) {
           if (response.status === 401) {
             localStorage.removeItem("access_token");
@@ -52,11 +48,11 @@ export default function ClientDashboard() {
             return;
           }
 
-          throw new Error(
-            data.detail || "Failed to load profile"
-          );
+          const data = await readApiResponse(response);
+          throw new Error(data.detail || `Failed to load profile (HTTP ${response.status}).`);
         }
 
+        const data = await readApiResponse(response);
         setProfile(data);
 
         if (data.profile_photo_url) {
@@ -69,7 +65,8 @@ export default function ClientDashboard() {
         }
       })
       .catch((error) => {
-        console.error("Profile error:", error);
+        console.error("Profile error:", error.message);
+        setProfileError(error.message || "Unable to load your profile.");
       })
       .finally(() => {
         setLoading(false);
@@ -251,9 +248,9 @@ export default function ClientDashboard() {
           <div className="error-box">
             <h2>Unable to load profile</h2>
 
-            <p>We couldn't load your profile details.</p>
+            <p>{profileError || "We couldn't load your profile details."}</p>
 
-            <button type="button" onClick={() => navigate("/login")}>Go to Login</button>
+            <button type="button" onClick={() => navigate("/profile/edit")}>Open Profile Details</button>
           </div>
         </div>
       </ClientLayout>

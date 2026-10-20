@@ -1,5 +1,5 @@
-import { API_URL } from "../../api.js";
-import React, { useEffect, useState } from "react";
+import { API_URL, fetchWithTokenRefresh, readApiResponse } from "../../api.js";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AdminDashboard.css";
 
@@ -16,7 +16,7 @@ export default function AdminDashboard() {
   // NORMALIZE STATUS
   // =====================================================
 
-  const normalizeStatus = (status) => {
+  const normalizeStatus = useCallback((status) => {
     if (!status) return "PENDING";
 
     const value = String(status).trim().toUpperCase();
@@ -43,13 +43,13 @@ export default function AdminDashboard() {
       default:
         return value;
     }
-  };
+  }, []);
 
   // =====================================================
   // FETCH REGISTRATIONS
   // =====================================================
 
-  const fetchRegistrations = async () => {
+  const fetchRegistrations = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
@@ -61,20 +61,16 @@ export default function AdminDashboard() {
         return;
       }
 
-      const response = await fetch(
+      const response = await fetchWithTokenRefresh(
         `${API_URL}/adminpanel/registrations/`,
         {
           method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
+          authRedirect: "/admin/login",
         }
       );
 
-      const data = await response.json();
-
-      console.log("ADMIN API RESPONSE:", data);
+      const data = await readApiResponse(response);
 
       // =================================================
       // TOKEN ERROR
@@ -89,6 +85,13 @@ export default function AdminDashboard() {
       }
 
       if (!response.ok) {
+        if (response.status === 403) {
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("refresh_token");
+          localStorage.removeItem("user");
+          localStorage.removeItem("admin_user");
+          navigate("/admin/login", { replace: true });
+        }
         throw new Error(
           data?.detail ||
             data?.message ||
@@ -150,11 +153,6 @@ export default function AdminDashboard() {
         };
       });
 
-      console.log(
-        "FORMATTED ADMIN REGISTRATIONS:",
-        formattedData
-      );
-
       setRegistrations(formattedData);
     } catch (error) {
       console.error("Admin Dashboard Error:", error);
@@ -167,15 +165,16 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigate, normalizeStatus]);
 
   // =====================================================
   // INITIAL LOAD
   // =====================================================
 
   useEffect(() => {
-    fetchRegistrations();
-  }, []);
+    const timer = setTimeout(fetchRegistrations, 0);
+    return () => clearTimeout(timer);
+  }, [fetchRegistrations]);
 
   // =====================================================
   // COUNTS
@@ -216,6 +215,8 @@ export default function AdminDashboard() {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
     localStorage.removeItem("admin_user");
+    localStorage.removeItem("user");
+    window.dispatchEvent(new Event("auth-change"));
 
     navigate("/admin/login");
   };

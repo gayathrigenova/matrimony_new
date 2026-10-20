@@ -1,8 +1,16 @@
-import { API_URL } from "../../api.js";
+import { API_URL, fetchWithTokenRefresh, readApiResponse } from "../../api.js";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import ProtectedImage from "../../components/ProtectedImage";
 import ProtectedFileLink from "../../components/ProtectedFileLink";
+
+function clearAdminSession() {
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+  localStorage.removeItem("admin_user");
+  localStorage.removeItem("user");
+  window.dispatchEvent(new Event("auth-change"));
+}
 
 export default function RegistrationReview() {
   const { id } = useParams();
@@ -23,7 +31,7 @@ export default function RegistrationReview() {
     try {
       setLoading(true);
 
-      const response = await fetch(
+      const response = await fetchWithTokenRefresh(
         `${API_URL}/adminpanel/registrations/${id}/`,
         {
           method: "GET",
@@ -31,6 +39,7 @@ export default function RegistrationReview() {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
+          authRedirect: "/admin/login",
         }
       );
 
@@ -43,11 +52,15 @@ export default function RegistrationReview() {
         return;
       }
 
-      const data = await response.json();
+      const data = await readApiResponse(response);
 
       if (!response.ok) {
+        if (response.status === 403) {
+          clearAdminSession();
+          navigate("/admin/login", { replace: true });
+        }
         console.error("Fetch Error:", data);
-        alert("Unable to load registration details.");
+        alert(data.detail || "Unable to load registration details.");
         return;
       }
 
@@ -89,7 +102,7 @@ export default function RegistrationReview() {
       message = "Are you sure you want to reject this registration?";
     }
 
-    if (action === "approve") {
+    if (action === "approve") {  
       message = "Are you sure you want to approve this registration?";
     }
 
@@ -115,13 +128,14 @@ export default function RegistrationReview() {
           ? JSON.stringify({ rejection_reason: reason.trim() })
           : null;
 
-      const response = await fetch(url, {
+      const response = await fetchWithTokenRefresh(url, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
         body,
+        authRedirect: "/admin/login",
       });
 
       if (response.status === 401) {
@@ -133,9 +147,13 @@ export default function RegistrationReview() {
         return;
       }
 
-      const data = await response.json();
+      const data = await readApiResponse(response);
 
       if (!response.ok) {
+        if (response.status === 403) {
+          clearAdminSession();
+          navigate("/admin/login", { replace: true });
+        }
         console.error("Action Error:", data);
 
         alert(

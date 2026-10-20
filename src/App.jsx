@@ -1,4 +1,3 @@
-import React from "react";
 import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 
 import Navbar from "./components/Navbar";
@@ -94,8 +93,8 @@ function AppLayout() {
           ========================= */}
 
           <Route path="/admin/login" element={<AdminLogin />} />
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
-          <Route path="/admin/view/:id" element={<RegistrationReview />} />
+          <Route path="/admin/dashboard" element={<AdminOnlyRoute><AdminDashboard /></AdminOnlyRoute>} />
+          <Route path="/admin/view/:id" element={<AdminOnlyRoute><RegistrationReview /></AdminOnlyRoute>} />
 
           {/* =========================
               CLIENT
@@ -144,6 +143,23 @@ function ClientOnlyRoute({ children }) {
   if (role === "ADMIN") return <Navigate to="/admin/dashboard" replace />;
   if (role === "BROKER") return <Navigate to="/broker/dashboard" replace />;
   return <Navigate to="/login" replace />;
+}
+
+function AdminOnlyRoute({ children }) {
+  if (!localStorage.getItem("access_token")) {
+    return <Navigate to="/admin/login" replace />;
+  }
+
+  try {
+    const storedUser = JSON.parse(
+      localStorage.getItem("admin_user") || localStorage.getItem("user") || "null",
+    );
+    if (storedUser?.role === "ADMIN") return children;
+  } catch {
+    return <Navigate to="/admin/login" replace />;
+  }
+
+  return <Navigate to="/admin/login" replace />;
 }
 
 

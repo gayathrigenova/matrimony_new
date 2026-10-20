@@ -1,5 +1,5 @@
 import { API_URL } from "../../api.js";
-import React, { useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AdminLogin.css";
 
@@ -14,6 +14,10 @@ export default function AdminLogin() {
 const handleSubmit = async (e) => {
   e.preventDefault();
   setLoading(true);
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+  localStorage.removeItem("user");
+  localStorage.removeItem("admin_user");
 
   try {
     const response = await fetch(
@@ -31,8 +35,6 @@ const handleSubmit = async (e) => {
     );
 
     const data = await response.json();
-
-    console.log("Login Response:", data);
 
     if (!response.ok) {
       alert(
@@ -58,6 +60,8 @@ const handleSubmit = async (e) => {
       "admin_user",
       JSON.stringify(data.user)
     );
+    localStorage.setItem("user", JSON.stringify(data.user));
+    window.dispatchEvent(new Event("auth-change"));
 
     alert("Admin login successful!");
 

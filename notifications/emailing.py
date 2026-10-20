@@ -9,13 +9,24 @@ logger = logging.getLogger(__name__)
 
 
 def send_profile_email(subject, body, recipient):
-    if not recipient:
+    if not recipient or not recipient.strip():
         logger.warning("Profile notification skipped: recipient email is missing.")
-        return
+        return False
     try:
-        send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [recipient], fail_silently=False)
+        sent_count = send_mail(
+            subject,
+            body,
+            settings.DEFAULT_FROM_EMAIL,
+            [recipient.strip()],
+            fail_silently=False,
+        )
     except Exception:
         logger.exception("Profile notification delivery failed.")
+        return False
+    if sent_count != 1:
+        logger.error("Profile notification was not accepted by the configured email backend.")
+        return False
+    return True
 
 
 def notify_admin_profile_change(registration):

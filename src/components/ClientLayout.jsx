@@ -1,5 +1,5 @@
-import { API_URL } from "../api.js";
-import React, { useEffect, useState } from "react";
+import { API_URL, fetchWithTokenRefresh, readApiResponse } from "../api.js";
+import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "../pages/ClientDashboard.css";
 
@@ -9,7 +9,7 @@ export default function ClientLayout({ children }) {
   const location = useLocation();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [profile, setProfile] = useState(null);
+  const [profileError, setProfileError] = useState("");
   const [loading, setLoading] = useState(true);
 
   const token = localStorage.getItem("access_token");
@@ -39,11 +39,8 @@ export default function ClientLayout({ children }) {
     }
 
     // Load profile header summary
-    fetch(`${API_URL}/registrations/my-profile/`, {
+    fetchWithTokenRefresh(`${API_URL}/registrations/my-profile/`, {
       method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
     })
       .then(async (res) => {
         if (!res.ok) {
@@ -55,13 +52,14 @@ export default function ClientLayout({ children }) {
             navigate("/login");
             return;
           }
-          throw new Error("Failed to load profile");
+          const data = await readApiResponse(res);
+          throw new Error(data.detail || `Failed to load profile (HTTP ${res.status}).`);
         }
-        const data = await res.json();
-        setProfile(data);
+        await readApiResponse(res);
       })
       .catch((err) => {
-        console.error("ClientLayout profile error:", err);
+        console.error("ClientLayout profile error:", err.message);
+        setProfileError(err.message || "Unable to load your profile.");
       })
       .finally(() => {
         setLoading(false);
@@ -227,6 +225,11 @@ export default function ClientLayout({ children }) {
 
         {/* CONTENT */}
         <main className="dashboard-content">
+          {profileError && (
+            <div className="alert-message error" role="alert">
+              Your profile could not be loaded: {profileError}
+            </div>
+          )}
           {children}
         </main>
       </div>

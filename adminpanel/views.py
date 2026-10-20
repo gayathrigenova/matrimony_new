@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 
 from accounts.permissions import IsAdmin
-from registrations.models import Registration
+from registrations.models import ClientPhoto, Registration
 
 from .models import ProfileVerification
 from .serializers import (
@@ -31,6 +31,12 @@ def pending_change(registration):
         registration=registration,
         status=ProfileChange.Status.PENDING_REVIEW,
     ).first()
+
+
+def pending_gallery_photos(registration):
+    return registration.photos.exclude(
+        pending_photo=""
+    ).exclude(pending_photo__isnull=True)
 
 
 def registration_payload(registration, request, change=None):
@@ -123,7 +129,7 @@ class AdminRegistrationDetailView(APIView):
 
         pending_photos = []
         if change:
-            for photo in registration.photos.filter(pending_photo__isnull=False):
+            for photo in pending_gallery_photos(registration):
                 pending_photos.append({
                     "slot_index": photo.slot_index,
                     "url": request.build_absolute_uri(f"/api/registrations/pending-files/gallery-photo/{photo.pk}/"),
@@ -149,6 +155,23 @@ class AdminApproveRegistrationView(APIView):
 
     def post(self, request, pk):
         try:
+            return self._approve_registration(request, pk)
+        except Exception:
+            logger.exception(
+                "Registration approval failed (registration_id=%s, admin_id=%s)",
+                pk,
+                request.user.pk,
+            )
+            return Response(
+                {
+                    "detail": "Approval could not be completed. Please try again later.",
+                    "code": "approval_failed",
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    def _approve_registration(self, request, pk):
+        try:
             registration = Registration.objects.get(pk=pk)
         except Registration.DoesNotExist:
             return Response(
@@ -158,13 +181,56 @@ class AdminApproveRegistrationView(APIView):
 
         change = pending_change(registration)
         if not change and registration.status in (Registration.Status.APPROVED, Registration.Status.PUBLISHED):
-            return Response({"message": "Registration is already approved or published.", "status": registration.status})
+            return Response({
+                "message": "Registration is already approved or published.",
+                "status": registration.status,
+                "matrimony_id": registration.matrimony_id,
+            })
+        if change and change.user_id != registration.user_id:
+            logger.error(
+                "Cannot approve registration %s: pending change %s belongs to a different user.",
+                registration.pk,
+                change.pk,
+            )
+            return Response(
+                {
+                    "detail": "The pending profile change does not match this registration owner.",
+                    "code": "invalid_pending_change",
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        if change:
+            missing_uploads = []
+            for field in ("pending_profile_photo", "pending_identity_document", "pending_additional_document"):
+                pending_file = getattr(change, field)
+                if pending_file and not pending_file.storage.exists(pending_file.name):
+                    missing_uploads.append(field.removeprefix("pending_").replace("_", " "))
+            for photo in pending_gallery_photos(registration):
+                if photo.pending_photo and not photo.pending_photo.storage.exists(photo.pending_photo.name):
+                    missing_uploads.append(f"gallery photo {photo.slot_index}")
+            if missing_uploads:
+                logger.error(
+                    "Cannot approve registration %s: pending media is missing: %s",
+                    registration.pk,
+                    ", ".join(missing_uploads),
+                )
+                return Response(
+                    {
+                        "detail": (
+                            "Approval could not complete because pending upload files are missing "
+                            f"from media storage: {', '.join(missing_uploads)}. "
+                            "Keep a persistent Railway Volume mounted for Django media and ask the client to re-upload the missing files."
+                        ),
+                        "code": "pending_media_missing",
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
         was_published_update = bool(change and change.previous_status == Registration.Status.PUBLISHED)
         with transaction.atomic():
             if change:
                 pending_to_delete = []
                 has_pending_profile_photo = bool(change.pending_profile_photo)
-                has_pending_main_gallery_photo = registration.photos.filter(slot_index=1, pending_photo__isnull=False).exists()
+                has_pending_main_gallery_photo = pending_gallery_photos(registration).filter(slot_index=1).exists()
                 for field, value in change.pending_data.items():
                     if hasattr(registration, field):
                         if field == "date_of_birth" and isinstance(value, str):
@@ -180,7 +246,7 @@ class AdminApproveRegistrationView(APIView):
                 registration.status = (
                     Registration.Status.PUBLISHED if was_published_update else Registration.Status.APPROVED
                 )
-                for photo in registration.photos.filter(pending_photo__isnull=False):
+                for photo in pending_gallery_photos(registration):
                     pending_file = photo.pending_photo
                     pending_file.open("rb")
                     photo.photo.save(Path(pending_file.name).name, pending_file.file, save=False)
@@ -192,7 +258,6 @@ class AdminApproveRegistrationView(APIView):
                         registration.profile_photo = photo.photo
                 registration.save()
                 if has_pending_profile_photo and not has_pending_main_gallery_photo:
-                    from registrations.models import ClientPhoto
                     main_photo, _ = ClientPhoto.objects.get_or_create(registration=registration, slot_index=1, defaults={"is_main": True})
                     main_photo.photo.save(Path(registration.profile_photo.name).name, registration.profile_photo.file, save=False)
                     main_photo.is_main = True
@@ -223,11 +288,15 @@ class AdminApproveRegistrationView(APIView):
                 transaction.on_commit(lambda: notify_client_approval(registration, updated=True))
 
         if was_published_update:
-            return Response({"message": "Updated profile approved and published.", "status": registration.status})
+            return Response({
+                "message": "Updated profile approved and published.",
+                "status": registration.status,
+                "matrimony_id": registration.matrimony_id,
+            })
 
         return Response({
             "message": "Registration approved successfully.",
-            "status": verification.status,
+            "status": registration.status,
             "matrimony_id": registration.matrimony_id,
         })
 

@@ -59,6 +59,34 @@
   border-bottom: 1px solid var(--border);
 }
 
+.profile-upload-preview {
+  width: 144px;
+  height: 144px;
+  margin-bottom: 16px;
+  overflow: hidden;
+  border: 3px solid var(--border);
+  border-radius: 50%;
+  background: #f7faf8;
+}
+
+.profile-upload-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.edit-profile-photo-placeholder {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  color: var(--muted);
+  font-size: 48px;
+  font-weight: 600;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));

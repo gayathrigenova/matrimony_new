@@ -1,4 +1,4 @@
-import { API_URL } from "../../api.js";
+import { API_URL, fetchWithTokenRefresh, readApiResponse } from "../../api.js";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import ClientLayout from "../../components/ClientLayout";
@@ -20,11 +20,8 @@ export default function MyProfile() {
       return;
     }
 
-    fetch(`${API_URL}/registrations/my-profile/`, {
+    fetchWithTokenRefresh(`${API_URL}/registrations/my-profile/`, {
       method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
     })
       .then(async (res) => {
         if (!res.ok) {
@@ -34,10 +31,10 @@ export default function MyProfile() {
             navigate("/login");
             return;
           }
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.detail || "Unable to load profile information.");
+          const errData = await readApiResponse(res);
+          throw new Error(errData.detail || `Unable to load profile information (HTTP ${res.status}).`);
         }
-        return res.json();
+        return readApiResponse(res);
       })
       .then((data) => {
         setProfile(data);

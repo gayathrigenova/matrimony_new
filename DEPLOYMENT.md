@@ -15,7 +15,10 @@ applies migrations and starts Gunicorn. Set:
 - `MYSQLHOST`, `MYSQLPORT`, `MYSQLDATABASE`, `MYSQLUSER`, `MYSQLPASSWORD`:
   Railway MySQL connection values.
 - `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`,
-  `EMAIL_USE_TLS`, `DEFAULT_FROM_EMAIL`: SMTP settings from your email provider.
+  `DEFAULT_FROM_EMAIL`: SMTP settings from your email provider. Use port `587`
+  with `EMAIL_USE_TLS=true` and `EMAIL_USE_SSL=false`, or port `465` with
+  `EMAIL_USE_SSL=true` and `EMAIL_USE_TLS=false`. The application rejects
+  enabling TLS and SSL together. Keep credentials only in Railway variables.
 - `ADMIN_NOTIFICATION_EMAIL`: destination for profile review notices.
 - `ADMIN_DASHBOARD_URL`: frontend origin used for admin review links.
 - `FRONTEND_URL`: frontend origin used in client emails.
@@ -27,7 +30,15 @@ uploads need to be copied to the volume or uploaded again. Public profile images
 are served under `/media/profiles/`; pending uploads use authenticated API URLs.
 
 The deployment command runs database migrations before startup. Confirm that
-`adminpanel.0002_profilechange` succeeds in Railway deployment logs.
+`adminpanel.0002_profilechange` and `registrations.0009_unique_registration_phone`
+succeed in Railway deployment logs. Before applying the latter to an existing
+database, review its duplicate-phone preflight: it stops if normalized duplicate
+phone values exist, then converts blank phone values to `NULL` before adding
+the unique constraint. Back up the Railway database and review
+`python manage.py migrate --plan` before deployment.
+The `registrations` app retains `AutoField` IDs to match its migration history;
+do not generate a primary-key widening migration unless a deliberate database
+migration plan has been reviewed for the existing MySQL tables and foreign keys.
 
 ## Frontend
 

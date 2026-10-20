@@ -7,16 +7,32 @@
   margin-bottom: 18px;
 }
 
-.public-profile-breadcrumb a,
-.public-profile-error a {
+.public-profile-back-link {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid #e5c6d5;
+  border-radius: 8px;
+  background: #fff;
   color: #8b0045;
   font-weight: 600;
   text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
-.public-profile-breadcrumb a:hover,
-.public-profile-error a:hover {
-  text-decoration: underline;
+.public-profile-back-link:hover {
+  border-color: #8b0045;
+  background: #fff7fa;
+}
+
+.public-profile-back-link:focus-visible {
+  outline: 3px solid rgba(139, 0, 69, 0.3);
+  outline-offset: 2px;
 }
 
 .public-profile-card {

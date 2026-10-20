@@ -39,7 +39,9 @@ export default function ProfileDetails() {
           <p className="public-profile-error" role="alert">
             {error || "Published profile not found."}
           </p>
-          <Link to="/profiles">Back to profiles</Link>
+          <Link className="public-profile-back-link" to="/profiles">
+            ← Back to Profiles
+          </Link>
         </div>
       </main>
     );
@@ -92,7 +94,9 @@ export default function ProfileDetails() {
   return (
     <main className="public-profile-page">
       <div className="public-profile-breadcrumb">
-        <Link to="/profiles">← Back to Profiles</Link>
+        <Link className="public-profile-back-link" to="/profiles">
+          ← Back to Profiles
+        </Link>
       </div>
       <div className="public-profile-card">
         <div className="public-profile-image">

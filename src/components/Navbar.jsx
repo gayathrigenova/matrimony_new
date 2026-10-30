@@ -1,30 +1,35 @@
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import './Navbar.css';
 import logo from '../assets/logo1.png';
+import { hasAuthenticatedSession } from '../api.js';
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const navigate = useNavigate();
+  const [isLoggedIn, setIsLoggedIn] = useState(hasAuthenticatedSession);
   const [isClientLoggedIn, setIsClientLoggedIn] = useState(hasClientSession);
 
   useEffect(() => {
-    const refreshClientStatus = () => setIsClientLoggedIn(hasClientSession());
-    window.addEventListener('auth-change', refreshClientStatus);
-    window.addEventListener('storage', refreshClientStatus);
+    const refreshAuthStatus = () => {
+      setIsLoggedIn(hasAuthenticatedSession());
+      setIsClientLoggedIn(hasClientSession());
+    };
+    window.addEventListener('auth-change', refreshAuthStatus);
+    window.addEventListener('storage', refreshAuthStatus);
     return () => {
-      window.removeEventListener('auth-change', refreshClientStatus);
-      window.removeEventListener('storage', refreshClientStatus);
+      window.removeEventListener('auth-change', refreshAuthStatus);
+      window.removeEventListener('storage', refreshAuthStatus);
     };
   }, []);
 
   const pages = [
     { name: 'Home', path: '/' },
     { name: 'Search', path: '/search' },
-    ...(isClientLoggedIn ? [{ name: 'My Profile', path: '/dashboard' }] : []),
+    ...(isClientLoggedIn ? [{ name: 'My Profile', path: '/profile' }] : []),
     { name: 'Membership', path: '/membership' },
     { name: 'Register', path: '/registration' },
     { name: 'Contact Us', path: '/contact' },
@@ -32,6 +37,16 @@ export default function Navbar() {
 
   const handleNavClick = () => {
     setIsOpen(false);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('admin_user');
+    window.dispatchEvent(new Event('auth-change'));
+    handleNavClick();
+    navigate('/');
   };
 
   const handleSearchSubmit = (e) => {
@@ -98,9 +113,15 @@ export default function Navbar() {
           </li>
         ))}
         <li className="wn-mobile-login-item">
-          <NavLink to="/login" className="wn-nav-link wn-mobile-login-link" onClick={handleNavClick}>
-            👤 Login
-          </NavLink>
+          {isLoggedIn ? (
+            <button type="button" className="wn-nav-link wn-mobile-login-link" onClick={handleLogout}>
+              Logout
+            </button>
+          ) : (
+            <NavLink to="/login" className="wn-nav-link wn-mobile-login-link" onClick={handleNavClick}>
+              👤 Login
+            </NavLink>
+          )}
         </li>
       </ul>
 
@@ -115,16 +136,22 @@ export default function Navbar() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </form>
-        <NavLink to="/login" className="wn-login-btn" onClick={handleNavClick}>
-          <span className="wn-login-icon">👤</span> Login
-        </NavLink>
+        {isLoggedIn ? (
+          <button type="button" className="wn-login-btn" onClick={handleLogout}>
+            Logout
+          </button>
+        ) : (
+          <NavLink to="/login" className="wn-login-btn" onClick={handleNavClick}>
+            <span className="wn-login-icon">👤</span> Login
+          </NavLink>
+        )}
       </div>
     </nav>
   );
 }
 
 function hasClientSession() {
-  if (!localStorage.getItem('access_token')) return false;
+  if (!hasAuthenticatedSession()) return false;
   try {
     return JSON.parse(localStorage.getItem('user') || 'null')?.role === 'CLIENT';
   } catch {

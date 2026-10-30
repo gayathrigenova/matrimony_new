@@ -22,6 +22,15 @@ applies migrations and starts Gunicorn. Set:
 - `ADMIN_NOTIFICATION_EMAIL`: destination for profile review notices.
 - `ADMIN_DASHBOARD_URL`: frontend origin used for admin review links.
 - `FRONTEND_URL`: frontend origin used in client emails.
+- `SMS_PROVIDER=twilio`: enables the Twilio SMS integration.
+- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and either
+  `TWILIO_FROM_NUMBER` or `TWILIO_MESSAGING_SERVICE_SID`: Twilio API credentials
+  and sender. Keep the auth token private and set these only in Railway
+  variables. `SMS_DEFAULT_COUNTRY_CODE` defaults to `+91` for local mobile
+  numbers; numbers already including `+` are sent as provided.
+- `OTP_EXPIRY_SECONDS` (default `600`), `OTP_RESEND_COOLDOWN_SECONDS`
+  (default `60`), and `OTP_MAX_ATTEMPTS` (default `5`): positive integer OTP
+  policy values.
 
 Keep `DEBUG` false in production. Attach a Railway Volume to the backend at
 `/app/media`; Django uses `RAILWAY_VOLUME_MOUNT_PATH` for `MEDIA_ROOT`. Without
@@ -74,5 +83,17 @@ Redeploy the Railway service after code changes.
    approval endpoints.
 
 SMTP delivery requires valid provider credentials and a verified sender.
-Without those settings, production email errors are logged; the API action
-still succeeds after its database transaction commits.
+Email/SMS OTP delivery failures stop verification and return a delivery error;
+registration cannot complete until both channels are verified. Post-registration
+and profile-change notifications are sent after the database transaction
+commits. Configure SMTP and `ADMIN_NOTIFICATION_EMAIL` so these notifications
+reach their recipients; delivery failures are logged without undoing a saved
+registration or profile update.
+
+The registration flow first requests email and mobile codes, verifies each
+code, then passes the one-time verification token through the existing
+registration steps. OTP hashes are stored in the database; the codes are never
+included in API responses. Deploy the `registrations.0011_verificationchallenge`
+migration together with the backend code, then rebuild/redeploy the frontend.
+Before production, test OTP delivery to a real email address and mobile number
+with the Railway SMTP and Twilio variables configured.

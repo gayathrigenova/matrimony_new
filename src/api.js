@@ -5,6 +5,16 @@ const API_ROOT = (configuredApiUrl || "https://matrimonynew-production.up.railwa
 
 export const API_URL = `${API_ROOT}/api`;
 
+export function hasAuthenticatedSession() {
+  if (!localStorage.getItem("access_token")) return false;
+  try {
+    const user = JSON.parse(localStorage.getItem("user") || "null");
+    return Boolean(user && typeof user === "object" && user.role);
+  } catch {
+    return false;
+  }
+}
+
 export async function readApiResponse(response) {
   try {
     return await response.json();

@@ -1,9 +1,14 @@
-from datetime import date
+from datetime import date, timedelta
 import logging
 import mimetypes
+import secrets
 from django.http import FileResponse
 from PIL import Image, UnidentifiedImageError
 
+from django.conf import settings
+from django.contrib.auth.hashers import check_password, make_password
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Q
 from django.contrib.auth import get_user_model
@@ -28,6 +33,7 @@ from .models import (
     ClientPhoto,
     Conversation,
     Message,
+    VerificationChallenge,
 )
 
 from .serializers import (
@@ -42,10 +48,32 @@ from .serializers import (
     MessageSerializer,
 )
 from adminpanel.models import ProfileChange, ProfileVerification
-from notifications.emailing import notify_admin_profile_change
+from notifications.emailing import notify_profile_update
+from .verification import (
+    VerificationDeliveryError,
+    send_email_otp,
+    send_mobile_otp,
+)
 
 
 logger = logging.getLogger(__name__)
+
+
+def _changed_profile_fields(registration, values):
+    changed = []
+    for field, value in values.items():
+        old_value = getattr(registration, field, None)
+        if hasattr(value, "name"):
+            value = value.name
+        if hasattr(old_value, "name"):
+            old_value = old_value.name
+        if hasattr(value, "isoformat"):
+            value = value.isoformat()
+        if hasattr(old_value, "isoformat"):
+            old_value = old_value.isoformat()
+        if old_value != value:
+            changed.append({"field_name": field, "old_value": old_value, "new_value": value})
+    return changed
 
 
 # =========================================================
@@ -71,6 +99,334 @@ class RegistrationAvailabilityView(APIView):
         if phone and Registration.objects.filter(phone__iexact=phone).exists():
             errors["phone"] = "This phone number is already registered. Please use a different number."
         return Response({"available": not errors, "errors": errors})
+
+
+def _new_otp():
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+
+def _otp_expiry():
+    return timezone.now() + timedelta(seconds=settings.OTP_EXPIRY_SECONDS)
+
+
+def _cooldown_response(challenge, now):
+    remaining = max(
+        0,
+        int(max(
+            challenge.email_resend_after,
+            challenge.phone_resend_after,
+        ).timestamp() - now.timestamp()),
+    )
+    return Response(
+        {
+            "detail": "Please wait before requesting another verification code.",
+            "resend_after": remaining,
+        },
+        status=status.HTTP_429_TOO_MANY_REQUESTS,
+    )
+
+
+class VerificationStartView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = str(request.data.get("email", "")).strip().lower()
+        phone = str(request.data.get("phone", "")).strip()
+        if not email or not phone:
+            return Response(
+                {"detail": "Email and mobile number are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            validate_email(email)
+        except DjangoValidationError:
+            return Response(
+                {"email": "Enter a valid email address."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        errors = {}
+        User = get_user_model()
+        if User.objects.filter(email__iexact=email).exists():
+            errors["email"] = "This email address is already registered."
+        if Registration.objects.filter(phone__iexact=phone).exists():
+            errors["phone"] = "This phone number is already registered."
+        if errors:
+            return Response(
+                {"detail": "Please use available contact information.", "errors": errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        now = timezone.now()
+        active_challenge = VerificationChallenge.objects.filter(
+            consumed_at__isnull=True,
+            expires_at__gt=now,
+        ).filter(Q(email=email) | Q(phone=phone)).order_by("-created_at").first()
+        challenge = None
+        if active_challenge:
+            same_contacts = (
+                active_challenge.email == email
+                and active_challenge.phone == phone
+            )
+            if not same_contacts and max(
+                active_challenge.email_resend_after,
+                active_challenge.phone_resend_after,
+            ) > now:
+                return _cooldown_response(active_challenge, now)
+            if same_contacts:
+                data = {
+                    "challenge_id": str(active_challenge.pk),
+                    "expires_in": max(
+                        0,
+                        int((active_challenge.expires_at - now).total_seconds()),
+                    ),
+                    "resend_after": {
+                        "email": max(
+                            0,
+                            int((active_challenge.email_resend_after - now).total_seconds()),
+                        ),
+                        "mobile": max(
+                            0,
+                            int((active_challenge.phone_resend_after - now).total_seconds()),
+                        ),
+                    },
+                    "email_verified": active_challenge.email_verified,
+                    "mobile_verified": active_challenge.phone_verified,
+                    "verification_in_progress": True,
+                }
+                if active_challenge.email_verified and active_challenge.phone_verified:
+                    data["verification_token"] = str(active_challenge.pk)
+                return Response(data, status=status.HTTP_200_OK)
+            else:
+                active_challenge.consumed_at = now
+                active_challenge.save(update_fields=["consumed_at"])
+
+        email_otp = _new_otp()
+        phone_otp = _new_otp()
+        while phone_otp == email_otp:
+            phone_otp = _new_otp()
+        cooldown = timedelta(seconds=settings.OTP_RESEND_COOLDOWN_SECONDS)
+        if challenge is None:
+            challenge = VerificationChallenge.objects.create(
+                email=email,
+                phone=phone,
+                email_otp_hash=make_password(email_otp),
+                phone_otp_hash=make_password(phone_otp),
+                email_resend_after=now + cooldown,
+                phone_resend_after=now + cooldown,
+                expires_at=_otp_expiry(),
+            )
+        else:
+            challenge.email_otp_hash = make_password(email_otp)
+            challenge.phone_otp_hash = make_password(phone_otp)
+            challenge.email_attempts = 0
+            challenge.phone_attempts = 0
+            challenge.email_verified = False
+            challenge.phone_verified = False
+            challenge.email_resend_after = now + cooldown
+            challenge.phone_resend_after = now + cooldown
+            challenge.expires_at = _otp_expiry()
+            challenge.save()
+
+        failures = []
+        for channel, sender, target, otp in (
+            ("email", send_email_otp, email, email_otp),
+            ("mobile", send_mobile_otp, phone, phone_otp),
+        ):
+            try:
+                sender(target, otp)
+            except VerificationDeliveryError:
+                failures.append(channel)
+
+        if failures:
+            challenge.consumed_at = timezone.now()
+            challenge.save(update_fields=["consumed_at"])
+            return Response(
+                {
+                    "detail": "Verification codes could not be delivered. Check the configured email/SMS service and try again.",
+                    "failed_channels": failures,
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        return Response(
+            {
+                "challenge_id": str(challenge.pk),
+                "expires_in": settings.OTP_EXPIRY_SECONDS,
+                "resend_after": {
+                    "email": settings.OTP_RESEND_COOLDOWN_SECONDS,
+                    "mobile": settings.OTP_RESEND_COOLDOWN_SECONDS,
+                },
+                "email_sent": True,
+                "mobile_sent": True,
+                "email_verified": False,
+                "mobile_verified": False,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class VerificationCodeView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        challenge_id = request.data.get("challenge_id")
+        channel = request.data.get("channel")
+        otp = str(request.data.get("otp", "")).strip()
+        if channel not in ("email", "mobile") or not otp:
+            return Response(
+                {"detail": "A verification channel and code are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(otp) != 6 or not otp.isdigit():
+            return Response(
+                {"detail": "Enter the six-digit verification code."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            with transaction.atomic():
+                challenge = VerificationChallenge.objects.select_for_update().get(
+                    pk=challenge_id
+                )
+                now = timezone.now()
+                if challenge.consumed_at or challenge.expires_at <= now:
+                    return Response(
+                        {"detail": "This verification request has expired. Request new codes."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                field_channel = "phone" if channel == "mobile" else channel
+                verified_field = f"{field_channel}_verified"
+                attempts_field = f"{field_channel}_attempts"
+                hash_field = f"{field_channel}_otp_hash"
+                attempts = getattr(challenge, attempts_field)
+                if attempts >= settings.OTP_MAX_ATTEMPTS:
+                    return Response(
+                        {"detail": "Too many incorrect attempts. Request new codes."},
+                        status=status.HTTP_429_TOO_MANY_REQUESTS,
+                    )
+                if not check_password(otp, getattr(challenge, hash_field)):
+                    attempts += 1
+                    setattr(challenge, attempts_field, attempts)
+                    challenge.save(update_fields=[attempts_field])
+                    remaining = max(0, settings.OTP_MAX_ATTEMPTS - attempts)
+                    return Response(
+                        {
+                            "detail": "The verification code is incorrect.",
+                            "attempts_remaining": remaining,
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                setattr(challenge, verified_field, True)
+                challenge.save(update_fields=[verified_field])
+                data = {
+                    "email_verified": challenge.email_verified,
+                    "mobile_verified": challenge.phone_verified,
+                }
+                if challenge.email_verified and challenge.phone_verified:
+                    data["verification_token"] = str(challenge.pk)
+                return Response(data, status=status.HTTP_200_OK)
+        except (
+            VerificationChallenge.DoesNotExist,
+            DjangoValidationError,
+            ValueError,
+            TypeError,
+        ):
+            return Response(
+                {"detail": "Verification request not found. Request new codes."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+
+class VerificationResendView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        challenge_id = request.data.get("challenge_id")
+        channel = request.data.get("channel")
+        if channel not in ("email", "mobile"):
+            return Response(
+                {"detail": "Choose email or mobile verification."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            with transaction.atomic():
+                challenge = VerificationChallenge.objects.select_for_update().get(
+                    pk=challenge_id
+                )
+                now = timezone.now()
+                if challenge.consumed_at or challenge.expires_at <= now:
+                    return Response(
+                        {"detail": "This verification request has expired. Start verification again."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                field_channel = "phone" if channel == "mobile" else channel
+                attempts_field = f"{field_channel}_attempts"
+                if getattr(challenge, attempts_field) >= settings.OTP_MAX_ATTEMPTS:
+                    return Response(
+                        {"detail": "Too many incorrect attempts. Start verification again."},
+                        status=status.HTTP_429_TOO_MANY_REQUESTS,
+                    )
+                resend_field = f"{field_channel}_resend_after"
+                resend_after = getattr(challenge, resend_field)
+                if resend_after > now:
+                    return Response(
+                        {
+                            "detail": "Please wait before requesting another verification code.",
+                            "resend_after": max(0, int((resend_after - now).total_seconds())),
+                        },
+                        status=status.HTTP_429_TOO_MANY_REQUESTS,
+                    )
+
+                otp = _new_otp()
+                sender = send_email_otp if channel == "email" else send_mobile_otp
+                target = challenge.email if channel == "email" else challenge.phone
+                try:
+                    sender(target, otp)
+                except VerificationDeliveryError as exc:
+                    return Response(
+                        {"detail": str(exc)},
+                        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    )
+
+                setattr(challenge, f"{field_channel}_otp_hash", make_password(otp))
+                setattr(challenge, attempts_field, 0)
+                setattr(challenge, f"{field_channel}_verified", False)
+                setattr(
+                    challenge,
+                    resend_field,
+                    now + timedelta(seconds=settings.OTP_RESEND_COOLDOWN_SECONDS),
+                )
+                challenge.expires_at = _otp_expiry()
+                challenge.save(
+                    update_fields=[
+                        f"{field_channel}_otp_hash",
+                        attempts_field,
+                        f"{field_channel}_verified",
+                        resend_field,
+                        "expires_at",
+                    ]
+                )
+                return Response(
+                    {
+                        "message": f"A new code was sent to your {channel}.",
+                        "expires_in": settings.OTP_EXPIRY_SECONDS,
+                        "resend_after": settings.OTP_RESEND_COOLDOWN_SECONDS,
+                    },
+                    status=status.HTTP_200_OK,
+                )
+        except (
+            VerificationChallenge.DoesNotExist,
+            DjangoValidationError,
+            ValueError,
+            TypeError,
+        ):
+            return Response(
+                {"detail": "Verification request not found. Start verification again."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
 
 # =========================================================
@@ -571,6 +927,9 @@ class MyProfileView(
         registration = self.get_object()
 
         old_status = registration.status
+        changed_fields = _changed_profile_fields(
+            registration, serializer.validated_data
+        )
 
         # -------------------------------------------------
         # PUBLISHED / APPROVED PROFILE EDIT
@@ -599,7 +958,9 @@ class MyProfileView(
             change.user = self.request.user
             changed = []
             for key, value in pending_data.items():
-                old_value = getattr(registration, key, None)
+                old_value = change.pending_data.get(
+                    key, getattr(registration, key, None)
+                )
                 old_value = old_value.isoformat() if hasattr(old_value, "isoformat") else old_value
                 if old_value != value:
                     changed.append({"field_name": key, "old_value": old_value, "new_value": value})
@@ -625,7 +986,13 @@ class MyProfileView(
             verification.correction_message = ""
             verification.rejection_reason = ""
             verification.save(update_fields=["status", "correction_message", "rejection_reason", "updated_at"])
-            transaction.on_commit(lambda: notify_admin_profile_change(registration))
+            if changed:
+                details = list(changed)
+                transaction.on_commit(
+                    lambda registration=registration, details=details: (
+                        notify_profile_update(registration, details)
+                    )
+                )
 
         # -------------------------------------------------
         # CORRECTION REQUIRED
@@ -643,10 +1010,160 @@ class MyProfileView(
         else:
             serializer.save()
 
+        if (
+            old_status not in [Registration.Status.PUBLISHED, Registration.Status.APPROVED]
+            and changed_fields
+        ):
+            details = list(changed_fields)
+            transaction.on_commit(
+                lambda registration=registration, details=details: (
+                    notify_profile_update(registration, details)
+                )
+            )
+
         if old_status not in [Registration.Status.PUBLISHED, Registration.Status.APPROVED]:
             verification, _ = ProfileVerification.objects.get_or_create(client=self.request.user)
-            verification.status = ProfileVerification.Status.PENDING
+            verification.status = (
+                ProfileVerification.Status.UNDER_REVIEW
+                if old_status == Registration.Status.CORRECTION_REQUIRED
+                else ProfileVerification.Status.PENDING
+            )
             verification.save(update_fields=["status", "updated_at"])
+
+class MyHoroscopeFileView(APIView):
+
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+    max_file_size = 5 * 1024 * 1024
+
+    def get_registration(self, request):
+        try:
+            return Registration.objects.get(user=request.user)
+        except Registration.DoesNotExist:
+            return None
+
+    def get(self, request):
+        registration = self.get_registration(request)
+        if registration is None:
+            return Response(
+                {"detail": "Registration profile not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if not registration.horoscope_file:
+            return Response(
+                {"detail": "No horoscope file has been uploaded."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        try:
+            horoscope_file = registration.horoscope_file.open("rb")
+        except OSError:
+            logger.exception(
+                "Unable to open horoscope file for registration %s.",
+                registration.pk,
+            )
+            return Response(
+                {"detail": "The stored horoscope file could not be opened."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        response = FileResponse(horoscope_file, content_type="image/jpeg")
+        response["X-Content-Type-Options"] = "nosniff"
+        response["Cache-Control"] = "private, no-store"
+        return response
+
+    def post(self, request):
+        registration = self.get_registration(request)
+        if registration is None:
+            return Response(
+                {"detail": "Registration profile not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        horoscope_file = request.FILES.get("horoscope_file")
+        if not horoscope_file:
+            return Response(
+                {"detail": "A JPG horoscope file is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if horoscope_file.size > self.max_file_size:
+            return Response(
+                {"detail": "The JPG horoscope file must be smaller than 5 MB."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not horoscope_file.name.lower().endswith((".jpg", ".jpeg")):
+            return Response(
+                {"detail": "Choose a JPG or JPEG file."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            image = Image.open(horoscope_file)
+            image.verify()
+            is_jpeg = image.format == "JPEG"
+            horoscope_file.seek(0)
+        except (UnidentifiedImageError, OSError, ValueError, SyntaxError):
+            is_jpeg = False
+
+        if not is_jpeg:
+            return Response(
+                {"detail": "The uploaded file is not a valid JPG image."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        previous_file_name = registration.horoscope_file.name
+        previous_file_storage = registration.horoscope_file.storage
+        registration.horoscope_file.save(
+            horoscope_file.name,
+            horoscope_file,
+            save=False,
+        )
+        registration.save(update_fields=["horoscope_file", "updated_at"])
+        if previous_file_name and previous_file_name != registration.horoscope_file.name:
+            previous_file_storage.delete(previous_file_name)
+
+        details = [{"field_name": "horoscope_file"}]
+        transaction.on_commit(
+            lambda registration=registration, details=details: (
+                notify_profile_update(registration, details)
+            )
+        )
+
+        return Response(
+            {
+                "message": "Horoscope file uploaded successfully.",
+                "horoscope_file_url": request.build_absolute_uri(
+                    "/api/registrations/my-profile/horoscope/"
+                ),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def delete(self, request):
+        registration = self.get_registration(request)
+        if registration is None:
+            return Response(
+                {"detail": "Registration profile not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if not registration.horoscope_file:
+            return Response(
+                {"detail": "No horoscope file has been uploaded."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        file_name = registration.horoscope_file.name
+        file_storage = registration.horoscope_file.storage
+        registration.horoscope_file = None
+        registration.save(update_fields=["horoscope_file", "updated_at"])
+        file_storage.delete(file_name)
+        details = [{"field_name": "horoscope_file_removed"}]
+        transaction.on_commit(
+            lambda registration=registration, details=details: (
+                notify_profile_update(registration, details)
+            )
+        )
+        return Response({"message": "Horoscope file removed successfully."})
 
 
 # =========================================================
@@ -1210,9 +1727,9 @@ class ClientPhotoUploadView(APIView):
         # Existing approved photo remains visible.
         # -------------------------------------------------
 
-        if (
-            registration.status
-            == Registration.Status.PUBLISHED
+        if registration.status in (
+            Registration.Status.PUBLISHED,
+            Registration.Status.APPROVED,
         ):
 
             old_pending_photo = client_photo.pending_photo
@@ -1238,7 +1755,12 @@ class ClientPhotoUploadView(APIView):
             verification, _ = ProfileVerification.objects.get_or_create(client=request.user)
             verification.status = ProfileVerification.Status.UNDER_REVIEW
             verification.save(update_fields=["status", "updated_at"])
-            transaction.on_commit(lambda: notify_admin_profile_change(registration))
+            details = list(change.changed_fields)
+            transaction.on_commit(
+                lambda registration=registration, details=details: (
+                    notify_profile_update(registration, details)
+                )
+            )
 
             message = (
                 "New photo uploaded and sent for "
@@ -1303,6 +1825,13 @@ class ClientPhotoUploadView(APIView):
                         "updated_at",
                     ]
                 )
+
+            details = [{"field_name": "gallery_photo", "slot_index": slot_index}]
+            transaction.on_commit(
+                lambda registration=registration, details=details: (
+                    notify_profile_update(registration, details)
+                )
+            )
 
             message = (
                 "Photo uploaded successfully."
@@ -1443,6 +1972,13 @@ class ClientPhotoActionView(APIView):
                 ]
             )
 
+            details = [{"field_name": "profile_photo"}]
+            transaction.on_commit(
+                lambda registration=registration, details=details: (
+                    notify_profile_update(registration, details)
+                )
+            )
+
             return Response(
                 {
                     "message": (
@@ -1534,6 +2070,13 @@ class ClientPhotoActionView(APIView):
             else:
                 registration.profile_photo = None
             registration.save(update_fields=["profile_photo", "updated_at"])
+
+        details = [{"field_name": "gallery_photo_removed", "slot_index": slot_index}]
+        transaction.on_commit(
+            lambda registration=registration, details=details: (
+                notify_profile_update(registration, details)
+            )
+        )
 
         return Response(
             {

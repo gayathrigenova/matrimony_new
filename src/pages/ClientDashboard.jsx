@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./ClientDashboard.css";
 import ClientLayout from "../components/ClientLayout";
+import ProtectedImage from "../components/ProtectedImage";
 
 
 export default function ClientDashboard() {
@@ -20,6 +21,8 @@ export default function ClientDashboard() {
   ]);
 
   const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [horoscopeBusy, setHoroscopeBusy] = useState(false);
+  const [horoscopeMessage, setHoroscopeMessage] = useState("");
 
   const token = localStorage.getItem("access_token");
 
@@ -155,6 +158,65 @@ export default function ClientDashboard() {
     setSelectedPhoto(null);
   };
 
+  const handleHoroscopeUpload = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (!/\.jpe?g$/i.test(file.name)) {
+      setHoroscopeMessage("Choose a JPG or JPEG file.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setHoroscopeMessage("The JPG horoscope file must be smaller than 5 MB.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("horoscope_file", file);
+    setHoroscopeBusy(true);
+    setHoroscopeMessage("");
+    try {
+      const response = await fetchWithTokenRefresh(
+        `${API_URL}/registrations/my-profile/horoscope/`,
+        { method: "POST", body: formData },
+      );
+      const data = await readApiResponse(response);
+      if (!response.ok) throw new Error(data.detail || "Unable to upload the horoscope file.");
+      setProfile((currentProfile) => ({
+        ...currentProfile,
+        horoscope_file_url: `${data.horoscope_file_url}?updated=${Date.now()}`,
+      }));
+      setHoroscopeMessage("Horoscope file uploaded successfully.");
+    } catch (error) {
+      setHoroscopeMessage(error.message || "Unable to upload the horoscope file.");
+    } finally {
+      setHoroscopeBusy(false);
+    }
+  };
+
+  const handleHoroscopeRemove = async () => {
+    setHoroscopeBusy(true);
+    setHoroscopeMessage("");
+    try {
+      const response = await fetchWithTokenRefresh(
+        `${API_URL}/registrations/my-profile/horoscope/`,
+        { method: "DELETE" },
+      );
+      const data = await readApiResponse(response);
+      if (!response.ok) throw new Error(data.detail || "Unable to remove the horoscope file.");
+      setProfile((currentProfile) => ({
+        ...currentProfile,
+        horoscope_file_url: null,
+      }));
+      setHoroscopeMessage("Horoscope file removed.");
+    } catch (error) {
+      setHoroscopeMessage(error.message || "Unable to remove the horoscope file.");
+    } finally {
+      setHoroscopeBusy(false);
+    }
+  };
+
   /* =========================================================
      STATUS MESSAGE
   ========================================================= */
@@ -236,7 +298,6 @@ export default function ClientDashboard() {
       </ClientLayout>
     );
   }
-
   /* =========================================================
      ERROR
   ========================================================= */
@@ -471,124 +532,10 @@ export default function ClientDashboard() {
           </section>
 
           {/* =================================================
-              PROFILE + PHOTOS
+              PHOTOS + HOROSCOPE
           ================================================= */}
 
           <div className="dashboard-two-column">
-
-            {/* PROFILE CARD */}
-
-            <section className="dashboard-panel profile-summary-panel">
-
-              <div className="panel-header">
-
-                <div>
-
-                  <h3>
-                    My Profile
-                  </h3>
-
-                  <p>
-                    Your basic profile information
-                  </p>
-
-                </div>
-
-                <button
-                  type="button"
-                  className="panel-action"
-                  onClick={() =>
-                    navigate("/profile/edit")
-                  }
-                >
-                  Edit Profile
-                </button>
-
-              </div>
-
-              <div className="profile-summary">
-
-                <div className="summary-photo">
-
-                  {profile.profile_photo_url ? (
-
-                    <img
-                      src={profile.profile_photo_url}
-                      alt={profile.full_name}
-                      onClick={() =>
-                        handleOpenPhoto(
-                          profile.profile_photo_url
-                        )
-                      }
-                    />
-
-                  ) : (
-
-                    <div className="summary-photo-empty">
-                      {profile.full_name
-                        ?.charAt(0)
-                        ?.toUpperCase() || "U"}
-                    </div>
-
-                  )}
-
-                </div>
-
-                <div className="summary-info">
-
-                  <h2>
-                    {profile.full_name}
-                  </h2>
-
-                  <p className="summary-id">
-                    Matrimony ID:{" "}
-                    <strong>
-                      {profile.matrimony_id || "-"}
-                    </strong>
-                  </p>
-
-                  <div className="summary-details">
-
-                    <SummaryDetail
-                      label="Age"
-                      value={profile.age}
-                    />
-
-                    <SummaryDetail
-                      label="Gender"
-                      value={profile.gender}
-                    />
-
-                    <SummaryDetail
-                      label="Religion"
-                      value={profile.religion}
-                    />
-
-                    <SummaryDetail
-                      label="Location"
-                      value={
-                        profile.city ||
-                        profile.district
-                      }
-                    />
-
-                    <SummaryDetail
-                      label="Education"
-                      value={profile.education}
-                    />
-
-                    <SummaryDetail
-                      label="Occupation"
-                      value={profile.occupation}
-                    />
-
-                  </div>
-
-                </div>
-
-              </div>
-
-            </section>
 
             {/* PHOTO PANEL */}
 
@@ -645,115 +592,70 @@ export default function ClientDashboard() {
 
             </section>
 
-          </div>
+            <section className="dashboard-panel horoscope-panel">
 
-          {/* =================================================
-              PERSONAL DETAILS
-          ================================================= */}
+              <div className="panel-header">
 
-          <section className="dashboard-panel details-panel">
+                <div>
 
-            <div className="panel-header">
+                  <h3>
+                    Horoscope
+                  </h3>
 
-              <div>
+                  <p>
+                    Your horoscope information
+                  </p>
 
-                <h3>
-                  Personal Details
-                </h3>
-
-                <p>
-                  Information visible on your profile
-                </p>
+                </div>
 
               </div>
 
-              <button
-                type="button"
-                className="panel-action"
-                onClick={() =>
-                  navigate("/dashboard/edit")
-                }
-              >
-                Edit
-              </button>
+              <div className="horoscope-content">
+                {profile.horoscope_file_url ? (
+                  <ProtectedImage
+                    src={profile.horoscope_file_url}
+                    alt="Your horoscope"
+                    className="horoscope-image"
+                  />
+                ) : (
+                  <p className="horoscope-empty-message">
+                    Upload your horoscope as a JPG or JPEG file.
+                  </p>
+                )}
 
-            </div>
+                <div className="horoscope-actions">
+                  <label className={`panel-action horoscope-upload-button ${horoscopeBusy ? "disabled" : ""}`}>
+                    {profile.horoscope_file_url ? "Replace JPG" : "Upload JPG"}
+                    <input
+                      type="file"
+                      accept=".jpg,.jpeg,image/jpeg"
+                      hidden
+                      onChange={handleHoroscopeUpload}
+                      disabled={horoscopeBusy}
+                    />
+                  </label>
+                  {profile.horoscope_file_url && (
+                    <button
+                      type="button"
+                      className="panel-action horoscope-remove-button"
+                      onClick={handleHoroscopeRemove}
+                      disabled={horoscopeBusy}
+                    >
+                      Remove
+                    </button>
+                  )}
+                  {horoscopeBusy && <span role="status">Saving...</span>}
+                </div>
+                {horoscopeMessage && (
+                  <p className="horoscope-message" role="status">
+                    {horoscopeMessage}
+                  </p>
+                )}
+              </div>
 
-            <div className="details-grid">
+            </section>
 
-              <Detail
-                label="Full Name"
-                value={profile.full_name}
-              />
-
-              <Detail
-                label="Gender"
-                value={profile.gender}
-              />
-
-              <Detail
-                label="Age"
-                value={profile.age}
-              />
-
-              <Detail
-                label="Religion"
-                value={profile.religion}
-              />
-
-              <Detail
-                label="Caste"
-                value={profile.caste}
-              />
-
-              <Detail
-                label="Marital Status"
-                value={profile.marital_status}
-              />
-
-              <Detail
-                label="Height"
-                value={profile.height}
-              />
-
-              <Detail
-                label="Education"
-                value={profile.education}
-              />
-
-              <Detail
-                label="Occupation"
-                value={profile.occupation}
-              />
-
-              <Detail
-                label="Company"
-                value={profile.company}
-              />
-
-              <Detail
-                label="Income"
-                value={profile.income}
-              />
-
-              <Detail
-                label="City"
-                value={profile.city}
-              />
-
-              <Detail
-                label="District"
-                value={profile.district}
-              />
-
-              <Detail
-                label="State"
-                value={profile.state}
-              />
-
-            </div>
-
-          </section>
+          </div>
 
           {/* =================================================
               ABOUT
@@ -943,54 +845,6 @@ function PhotoBox({
         </label>
 
       )}
-
-    </div>
-  );
-}
-
-
-/* =========================================================
-   SUMMARY DETAIL
-========================================================= */
-
-function SummaryDetail({
-  label,
-  value,
-}) {
-  return (
-    <div className="summary-detail">
-
-      <span>
-        {label}
-      </span>
-
-      <strong>
-        {value || "-"}
-      </strong>
-
-    </div>
-  );
-}
-
-
-/* =========================================================
-   PERSONAL DETAIL
-========================================================= */
-
-function Detail({
-  label,
-  value,
-}) {
-  return (
-    <div className="detail-item">
-
-      <span>
-        {label}
-      </span>
-
-      <strong>
-        {value || "-"}
-      </strong>
 
     </div>
   );

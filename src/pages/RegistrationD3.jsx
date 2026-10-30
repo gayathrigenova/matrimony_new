@@ -134,11 +134,6 @@ export default function RegistrationStep3() {
       extra_phone: formData.extraPhone,
     };
 
-    console.log("=================================");
-    console.log("FINAL REGISTRATION DATA");
-    console.log("=================================");
-    console.log(finalData);
-
     try {
       // =========================
       // SEND TO DJANGO BACKEND
@@ -156,15 +151,25 @@ export default function RegistrationStep3() {
 
       const result = await readApiResponse(response);
 
-      console.log("=================================");
-      console.log("REGISTRATION RESPONSE");
-      console.log("=================================");
-      console.log(result);
-
       // =========================
       // ERROR RESPONSE
       // =========================
       if (!response.ok) {
+        if (result.verification_token) {
+          const registrationWithoutToken = { ...registration };
+          delete registrationWithoutToken.verification_token;
+          navigate("/registration", {
+            state: {
+              registration: registrationWithoutToken,
+              step1FormData: location.state?.step1FormData,
+              step2FormData: location.state?.step2FormData,
+              step3FormData: formData,
+              verificationExpired: true,
+            },
+          });
+          return;
+        }
+
         console.error("Registration Error:", result);
 
         alert(

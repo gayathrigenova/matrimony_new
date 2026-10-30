@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 
 import './Home.css';
-import { API_URL, readApiResponse } from "../api.js";
+import { API_URL, hasAuthenticatedSession, readApiResponse } from "../api.js";
 
 const sliderContent = [
   {
@@ -42,7 +42,18 @@ export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [gender, setGender] = useState('male');
   const [activeFilter, setActiveFilter] = useState('all');
+  const [isAuthenticated, setIsAuthenticated] = useState(hasAuthenticatedSession);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const refreshAuthStatus = () => setIsAuthenticated(hasAuthenticatedSession());
+    window.addEventListener('auth-change', refreshAuthStatus);
+    window.addEventListener('storage', refreshAuthStatus);
+    return () => {
+      window.removeEventListener('auth-change', refreshAuthStatus);
+      window.removeEventListener('storage', refreshAuthStatus);
+    };
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -108,7 +119,7 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="hero-form-card">
+          {!isAuthenticated && <div className="hero-form-card">
             <div className="hero-form-header">
               <h3>Find Your Partner From Profiles</h3>
             </div>
@@ -172,7 +183,7 @@ export default function Home() {
                 </a>
               </div>
             </form>
-          </div>
+          </div>}
         </div>
       </div>
 

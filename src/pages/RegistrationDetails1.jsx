@@ -86,6 +86,7 @@ export default function RegistrationDetails1() {
         registration: updatedRegistration,
         step1FormData: location.state?.step1FormData,
         step2FormData: formData,
+        step3FormData: location.state?.step3FormData,
       },
     });
   };

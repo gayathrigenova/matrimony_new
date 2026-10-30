@@ -367,6 +367,99 @@
   transform: translateY(0);
 }
 
+.registration-verification {
+  margin: 2rem 0 1.25rem;
+  padding: 1.25rem;
+  border: 1px solid #d9e8df;
+  border-radius: 10px;
+  background: #f7fcf9;
+}
+
+.registration-verification h2 {
+  margin: 0 0 0.5rem;
+  color: #155d39;
+  font-size: 1.15rem;
+}
+
+.registration-verification > p {
+  color: #555;
+  line-height: 1.5;
+}
+
+.registration-otp-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.registration-otp-row .registration-form-group {
+  margin: 0;
+}
+
+.registration-otp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding-bottom: 0.25rem;
+}
+
+.registration-otp-actions .registration-submit-btn,
+.registration-resend-btn {
+  width: auto;
+  height: 40px;
+  margin: 0;
+  padding: 0 0.9rem;
+  border: 0;
+  border-radius: 7px;
+  background: #087c47;
+  color: #fff;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.registration-resend-btn {
+  border: 1px solid #087c47;
+  background: #fff;
+  color: #087c47;
+}
+
+.registration-otp-actions button:disabled,
+.registration-resend-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.registration-verified-status {
+  color: #087c47;
+  font-weight: 700;
+}
+
+.registration-verification-message {
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  border-radius: 7px;
+}
+
+.registration-verification-message.success {
+  background: #eaf8ef;
+  color: #155d39;
+}
+
+.registration-verification-message.error {
+  background: #fff0f0;
+  color: #a32121;
+}
+
+.registration-verification-message.info {
+  background: #eef4ff;
+  color: #294d83;
+}
+
 
 /* =====================================================
    RESPONSIVE
@@ -396,6 +489,10 @@
     grid-template-columns: 1fr;
 
     gap: 6px;
+  }
+
+  .registration-otp-row {
+    grid-template-columns: 1fr;
   }
 
   .registration-dob {

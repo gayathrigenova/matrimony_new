@@ -162,6 +162,9 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
   transition: background 0.3s ease;
   white-space: nowrap;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
 }
 
 .wn-login-btn:hover {
@@ -178,6 +181,12 @@
   font-weight: 700 !important;
   border-top: 2px solid #e2f5ec;
   text-shadow: none;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  font-family: inherit;
+  font-size: 1rem;
+  cursor: pointer;
 }
 
 /* Mobile search icon — hidden on desktop */

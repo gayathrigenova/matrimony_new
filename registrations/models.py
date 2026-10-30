@@ -1,5 +1,29 @@
-from django.db import models
+import uuid
+
 from django.conf import settings
+from django.db import models
+
+
+class VerificationChallenge(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email = models.EmailField()
+    phone = models.CharField(max_length=20)
+    email_otp_hash = models.CharField(max_length=128)
+    phone_otp_hash = models.CharField(max_length=128)
+    email_attempts = models.PositiveSmallIntegerField(default=0)
+    phone_attempts = models.PositiveSmallIntegerField(default=0)
+    email_verified = models.BooleanField(default=False)
+    phone_verified = models.BooleanField(default=False)
+    email_resend_after = models.DateTimeField()
+    phone_resend_after = models.DateTimeField()
+    expires_at = models.DateTimeField()
+    consumed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["email", "phone", "consumed_at"]),
+        ]
 
 
 class Registration(models.Model):
@@ -190,6 +214,12 @@ class Registration(models.Model):
 
     profile_photo = models.ImageField(
         upload_to="profiles/",
+        blank=True,
+        null=True
+    )
+
+    horoscope_file = models.FileField(
+        upload_to="documents/horoscope/",
         blank=True,
         null=True
     )

@@ -3,6 +3,9 @@ from django.urls import path
 from .views import (
     RegistrationCreateView,
     RegistrationAvailabilityView,
+    VerificationStartView,
+    VerificationCodeView,
+    VerificationResendView,
     PublishedRegistrationListView,
     PublishedRegistrationDetailView,
     PendingRegistrationListView,
@@ -12,6 +15,7 @@ from .views import (
     RegistrationCorrectionView,
     RegistrationPublishView,
     MyProfileView,
+    MyHoroscopeFileView,
     ProfileViewCreateView,
     SendInterestView,
     UpdateInterestView,
@@ -34,6 +38,9 @@ from .views import (
 urlpatterns = [
 
     path("availability/", RegistrationAvailabilityView.as_view(), name="registration-availability"),
+    path("verification/start/", VerificationStartView.as_view(), name="verification-start"),
+    path("verification/verify/", VerificationCodeView.as_view(), name="verification-verify"),
+    path("verification/resend/", VerificationResendView.as_view(), name="verification-resend"),
 
     # =========================================================
     # USER REGISTRATION
@@ -71,6 +78,11 @@ urlpatterns = [
         "my-profile/",
         MyProfileView.as_view(),
         name="my-profile"
+    ),
+    path(
+        "my-profile/horoscope/",
+        MyHoroscopeFileView.as_view(),
+        name="my-horoscope-file",
     ),
 
 

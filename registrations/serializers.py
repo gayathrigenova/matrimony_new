@@ -1,16 +1,22 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
+from django.utils import timezone
 from PIL import Image, UnidentifiedImageError
 
 from .models import (
     Registration,
+    VerificationChallenge,
     ProfileView,
     Interest,
     Shortlist,
     ClientPhoto,
     Conversation,
     Message,
+)
+from notifications.emailing import (
+    notify_admin_new_registration,
+    notify_registration_completed,
 )
 
 
@@ -61,6 +67,8 @@ class RegistrationSerializer(serializers.ModelSerializer):
         write_only=True,
         min_length=6
     )
+
+    verification_token = serializers.UUIDField(write_only=True)
 
     class Meta:
         model = Registration
@@ -127,6 +135,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
             "updated_at",
             "email",
             "password",
+            "verification_token",
         ]
 
         read_only_fields = [
@@ -170,18 +179,73 @@ class RegistrationSerializer(serializers.ModelSerializer):
             )
         return value or None
 
+    def validate(self, attrs):
+        phone = attrs.get("phone")
+        if not phone:
+            raise serializers.ValidationError(
+                {"phone": "A verified mobile number is required."}
+            )
+        challenge = VerificationChallenge.objects.filter(
+            pk=attrs["verification_token"],
+            email=attrs["email"],
+            phone=phone,
+            email_verified=True,
+            phone_verified=True,
+            consumed_at__isnull=True,
+            expires_at__gt=timezone.now(),
+        ).first()
+        if challenge is None:
+            raise serializers.ValidationError(
+                {
+                    "verification_token": (
+                        "Verify both your email and mobile number before completing registration."
+                    )
+                }
+            )
+        attrs["_verification_challenge"] = challenge
+        return attrs
+
     def create(self, validated_data):
         email = validated_data.pop("email").strip().lower()
         password = validated_data.pop("password")
+        validated_data.pop("verification_token")
+        verification_challenge = validated_data.pop("_verification_challenge")
         try:
             with transaction.atomic():
+                challenge = VerificationChallenge.objects.select_for_update().get(
+                    pk=verification_challenge.pk
+                )
+                if (
+                    challenge.consumed_at
+                    or challenge.expires_at <= timezone.now()
+                    or not challenge.email_verified
+                    or not challenge.phone_verified
+                    or challenge.email != email
+                    or challenge.phone != validated_data.get("phone")
+                ):
+                    raise serializers.ValidationError(
+                        {
+                            "verification_token": (
+                                "The contact verification has expired or was already used. Verify both contacts again."
+                            )
+                        }
+                    )
                 user = User.objects.create_user(
                     email=email,
                     password=password,
                     full_name=validated_data.get("full_name", ""),
                     role=User.Role.CLIENT,
                 )
-                return Registration.objects.create(user=user, **validated_data)
+                registration = Registration.objects.create(user=user, **validated_data)
+                challenge.consumed_at = timezone.now()
+                challenge.save(update_fields=["consumed_at"])
+                transaction.on_commit(
+                    lambda registration=registration: (
+                        notify_registration_completed(registration),
+                        notify_admin_new_registration(registration),
+                    )
+                )
+                return registration
         except IntegrityError:
             if User.objects.filter(email__iexact=email).exists():
                 raise serializers.ValidationError({"email": "This email address is already registered. Please log in or use a different email address."}) from None
@@ -273,6 +337,7 @@ class ClientProfileSerializer(serializers.ModelSerializer):
 
     age = serializers.SerializerMethodField()
     profile_photo_url = serializers.SerializerMethodField()
+    horoscope_file_url = serializers.SerializerMethodField()
     identity_document_url = serializers.SerializerMethodField()
     additional_document_url = serializers.SerializerMethodField()
     pending_data = serializers.SerializerMethodField()
@@ -324,6 +389,7 @@ class ClientProfileSerializer(serializers.ModelSerializer):
             "about",
             "profile_photo",
             "profile_photo_url",
+            "horoscope_file_url",
             "identity_document",
             "identity_document_url",
             "additional_document",
@@ -366,6 +432,7 @@ class ClientProfileSerializer(serializers.ModelSerializer):
             "matrimony_id",
             "age",
             "profile_photo_url",
+            "horoscope_file_url",
             "identity_document_url",
             "additional_document_url",
             "pending_data",
@@ -399,6 +466,13 @@ class ClientProfileSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(url)
             return url
         return None
+
+    def get_horoscope_file_url(self, obj):
+        if not obj.horoscope_file:
+            return None
+        request = self.context.get("request")
+        path = "/api/registrations/my-profile/horoscope/"
+        return request.build_absolute_uri(path) if request else path
 
     def get_identity_document_url(self, obj):
         return self._client_file_url(obj, "client-identity-document")

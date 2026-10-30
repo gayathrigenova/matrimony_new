@@ -47,6 +47,68 @@ class ProfileReviewWorkflowTests(TestCase):
         self.media_override.disable()
         self.media_dir.cleanup()
 
+    def test_published_profile_update_notifies_client_and_admin_and_stays_pending(self):
+        image_bytes = BytesIO()
+        Image.new("RGB", (2, 2), "blue").save(image_bytes, format="PNG")
+        with patch.dict(
+            os.environ,
+            {
+                "ADMIN_NOTIFICATION_EMAIL": "admin@example.com",
+                "ADMIN_DASHBOARD_URL": "https://matrimony.example.com",
+            },
+        ):
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client_api.patch(
+                    "/api/registrations/my-profile/",
+                    {
+                        "about": "Updated biography",
+                        "phone": "9111111111",
+                        "profile_photo": SimpleUploadedFile(
+                            "new-profile.png",
+                            image_bytes.getvalue(),
+                            content_type="image/png",
+                        ),
+                    },
+                    format="multipart",
+                )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["status"], "UNDER_REVIEW")
+        self.assertEqual(len(mail.outbox), 2)
+        self.assertEqual(mail.outbox[0].subject, "Your Matrimony profile has been updated")
+        self.assertEqual(mail.outbox[1].subject, "Matrimony profile update requires review")
+        self.assertIn("About", mail.outbox[0].body)
+        self.assertIn("Phone", mail.outbox[0].body)
+        self.assertIn("Profile Photo", mail.outbox[0].body)
+        self.assertIn("About", mail.outbox[1].body)
+        self.assertIn("Phone", mail.outbox[1].body)
+        self.assertIn("Profile Photo", mail.outbox[1].body)
+        self.assertIn("re-approval", mail.outbox[0].body)
+        self.registration.refresh_from_db()
+        self.assertEqual(self.registration.status, Registration.Status.PUBLISHED)
+        self.assertEqual(
+            ProfileVerification.objects.get(client=self.client_user).status,
+            ProfileVerification.Status.UNDER_REVIEW,
+        )
+
+    def test_repeating_the_same_pending_update_does_not_send_duplicate_emails(self):
+        with patch.dict(os.environ, {"ADMIN_NOTIFICATION_EMAIL": "admin@example.com"}):
+            with self.captureOnCommitCallbacks(execute=True):
+                first = self.client_api.patch(
+                    "/api/registrations/my-profile/",
+                    {"about": "Pending biography"},
+                    format="json",
+                )
+                second = self.client_api.patch(
+                    "/api/registrations/my-profile/",
+                    {"about": "Pending biography"},
+                    format="json",
+                )
+
+        self.assertEqual(first.status_code, 200, first.data)
+        self.assertEqual(second.status_code, 200, second.data)
+        self.assertEqual(len(mail.outbox), 2)
+
     def test_client_edit_is_staged_until_admin_approval(self):
         image_bytes = BytesIO()
         Image.new("RGB", (2, 2), "blue").save(image_bytes, format="PNG")

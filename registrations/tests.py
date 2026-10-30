@@ -296,7 +296,10 @@ class RegistrationDuplicateValidationTests(TestCase):
             format="json",
         )
         self.assertEqual(response.status_code, 503)
-        self.assertEqual(response.data["failed_channels"], ["mobile"])
+        self.assertEqual(
+            response.data["delivery_errors"],
+            [{"channel": "mobile", "detail": "SMS provider unavailable"}],
+        )
         self.assertTrue(
             VerificationChallenge.objects.filter(
                 email="sms-failure@example.com",
@@ -304,6 +307,29 @@ class RegistrationDuplicateValidationTests(TestCase):
             ).exists()
         )
         send_sms.assert_called_once()
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.smtp.EmailBackend",
+        EMAIL_HOST="",
+        EMAIL_HOST_USER="",
+        EMAIL_HOST_PASSWORD="",
+        DEFAULT_FROM_EMAIL="",
+    )
+    def test_missing_email_delivery_settings_are_reported_without_secrets(self):
+        response = self.client.post(
+            "/api/registrations/verification/start/",
+            {"email": "email-config@example.com", "phone": "9123456780"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 503)
+        email_error = next(
+            item
+            for item in response.data["delivery_errors"]
+            if item["channel"] == "email"
+        )
+        self.assertIn("EMAIL_HOST", email_error["detail"])
+        self.assertIn("EMAIL_HOST_PASSWORD", email_error["detail"])
+        self.assertNotIn("failed_channels", response.data)
 
 
 class AuthenticatedProfileApiTests(TestCase):

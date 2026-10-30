@@ -153,8 +153,8 @@ export default function Registration() {
             phone: result.phone || "",
           }));
         }
-        const channelErrors = result.failed_channels?.length
-          ? ` Failed delivery: ${result.failed_channels.join(", ")}.`
+        const channelErrors = result.delivery_errors?.length
+          ? ` ${result.delivery_errors.map(({ channel, detail }) => `${channel}: ${detail}`).join(" ")}`
           : "";
         throw new Error((result.detail || "Could not send verification codes.") + channelErrors);
       }

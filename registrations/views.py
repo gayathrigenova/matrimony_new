@@ -235,16 +235,20 @@ class VerificationStartView(APIView):
         ):
             try:
                 sender(target, otp)
-            except VerificationDeliveryError:
-                failures.append(channel)
+            except VerificationDeliveryError as exc:
+                logger.warning("Verification %s delivery failed: %s", channel, exc)
+                failures.append({"channel": channel, "detail": str(exc)})
 
         if failures:
             challenge.consumed_at = timezone.now()
             challenge.save(update_fields=["consumed_at"])
             return Response(
                 {
-                    "detail": "Verification codes could not be delivered. Check the configured email/SMS service and try again.",
-                    "failed_channels": failures,
+                    "detail": (
+                        "Verification codes could not be delivered. Configure the "
+                        "listed email/SMS settings in Railway, then try again."
+                    ),
+                    "delivery_errors": failures,
                 },
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )

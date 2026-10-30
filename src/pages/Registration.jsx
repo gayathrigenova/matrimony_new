@@ -30,6 +30,8 @@ export default function Registration() {
   );
   const [otpValues, setOtpValues] = useState({ email: "", mobile: "" });
   const [verifying, setVerifying] = useState({ email: false, mobile: false });
+  const [resending, setResending] = useState({ email: false, mobile: false });
+  const [resendMessages, setResendMessages] = useState({ email: null, mobile: null });
   const [verificationMessage, setVerificationMessage] = useState(
     prefill.verificationExpired
       ? {
@@ -237,16 +239,22 @@ export default function Registration() {
   };
 
   const handleResend = async (channel) => {
-    if (!verification?.challengeId) return;
+    if (!verification?.challengeId || resending[channel]) return;
+    setResending((current) => ({ ...current, [channel]: true }));
+    setResendMessages((current) => ({ ...current, [channel]: null }));
+    setVerificationMessage({ type: "", text: "" });
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 25000);
     try {
       const response = await fetch(`${API_URL}/registrations/verification/resend/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ challenge_id: verification.challengeId, channel }),
+        signal: controller.signal,
       });
       const result = await readApiResponse(response);
       if (!response.ok) {
-        if (result.resend_after) {
+        if (Number.isFinite(result.resend_after) && result.resend_after > 0) {
           setVerification((current) => ({
             ...current,
             resendAfter: {
@@ -270,15 +278,26 @@ export default function Registration() {
       }));
       setVerificationToken("");
       setOtpValues((current) => ({ ...current, [channel]: "" }));
-      setVerificationMessage({
-        type: "success",
-        text: `A new code was sent to your ${channel}.`,
-      });
+      setResendMessages((current) => ({
+        ...current,
+        [channel]: {
+          type: "success",
+          text: `A new code was sent to your ${channel}.`,
+        },
+      }));
     } catch (error) {
-      setVerificationMessage({
-        type: "error",
-        text: error.message || "Could not resend the verification code.",
-      });
+      setResendMessages((current) => ({
+        ...current,
+        [channel]: {
+          type: "error",
+          text: error.name === "AbortError"
+            ? "The resend request timed out. Please try again after the cooldown."
+            : error.message || `Could not resend the ${channel} verification code.`,
+        },
+      }));
+    } finally {
+      window.clearTimeout(timeoutId);
+      setResending((current) => ({ ...current, [channel]: false }));
     }
   };
 
@@ -694,13 +713,29 @@ export default function Registration() {
                               type="button"
                               className="registration-resend-btn"
                               onClick={() => handleResend(channel)}
-                              disabled={remaining > 0 || currentTime >= verification.expiresAt}
+                              disabled={
+                                resending[channel]
+                                || remaining > 0
+                                || currentTime >= verification.expiresAt
+                              }
                             >
-                              {remaining > 0 ? `Resend in ${remaining}s` : "Resend code"}
+                              {resending[channel]
+                                ? "Sending..."
+                                : remaining > 0
+                                  ? `Resend in ${remaining}s`
+                                  : "Resend code"}
                             </button>
                           </>
                         )}
                       </div>
+                      {resendMessages[channel] && (
+                        <p
+                          className={`registration-resend-message ${resendMessages[channel].type}`}
+                          role={resendMessages[channel].type === "error" ? "alert" : "status"}
+                        >
+                          {resendMessages[channel].text}
+                        </p>
+                      )}
                     </div>
                   );
                 })}

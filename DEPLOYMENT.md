@@ -18,7 +18,8 @@ applies migrations and starts Gunicorn. Set:
   `DEFAULT_FROM_EMAIL`: SMTP settings from your email provider. Use port `587`
   with `EMAIL_USE_TLS=true` and `EMAIL_USE_SSL=false`, or port `465` with
   `EMAIL_USE_SSL=true` and `EMAIL_USE_TLS=false`. The application rejects
-  enabling TLS and SSL together. Keep credentials only in Railway variables.
+  enabling TLS and SSL together. `EMAIL_TIMEOUT` sets the SMTP connection
+  timeout in seconds (default `10`). Keep credentials only in Railway variables.
 - `ADMIN_NOTIFICATION_EMAIL`: destination for profile review notices.
 - `ADMIN_DASHBOARD_URL`: frontend origin used for admin review links.
 - `FRONTEND_URL`: frontend origin used in client emails.
@@ -95,5 +96,8 @@ code, then passes the one-time verification token through the existing
 registration steps. OTP hashes are stored in the database; the codes are never
 included in API responses. Deploy the `registrations.0011_verificationchallenge`
 migration together with the backend code, then rebuild/redeploy the frontend.
+The resend endpoint is `/api/registrations/verification/resend/`; it enforces
+the configured per-channel cooldown even when a provider delivery fails, and
+only replaces the stored OTP after the provider accepts the send request.
 Before production, test OTP delivery to a real email address and mobile number
 with the Railway SMTP and Twilio variables configured.

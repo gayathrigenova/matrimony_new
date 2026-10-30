@@ -387,22 +387,26 @@ class VerificationResendView(APIView):
                 otp = _new_otp()
                 sender = send_email_otp if channel == "email" else send_mobile_otp
                 target = challenge.email if channel == "email" else challenge.phone
+                setattr(
+                    challenge,
+                    resend_field,
+                    now + timedelta(seconds=settings.OTP_RESEND_COOLDOWN_SECONDS),
+                )
+                challenge.save(update_fields=[resend_field])
                 try:
                     sender(target, otp)
                 except VerificationDeliveryError as exc:
                     return Response(
-                        {"detail": str(exc)},
+                        {
+                            "detail": str(exc),
+                            "resend_after": settings.OTP_RESEND_COOLDOWN_SECONDS,
+                        },
                         status=status.HTTP_503_SERVICE_UNAVAILABLE,
                     )
 
                 setattr(challenge, f"{field_channel}_otp_hash", make_password(otp))
                 setattr(challenge, attempts_field, 0)
                 setattr(challenge, f"{field_channel}_verified", False)
-                setattr(
-                    challenge,
-                    resend_field,
-                    now + timedelta(seconds=settings.OTP_RESEND_COOLDOWN_SECONDS),
-                )
                 challenge.expires_at = _otp_expiry()
                 challenge.save(
                     update_fields=[

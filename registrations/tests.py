@@ -257,6 +257,245 @@ class RegistrationDuplicateValidationTests(TestCase):
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
         DEFAULT_FROM_EMAIL="no-reply@example.com",
     )
+    @patch("registrations.views._new_otp", side_effect=["111111", "222222", "333333"])
+    @patch("registrations.views.send_mobile_otp")
+    def test_email_resend_invalidates_the_old_code_and_accepts_the_new_code(
+        self, send_sms, _new_otp
+    ):
+        start = self.client.post(
+            "/api/registrations/verification/start/",
+            {"email": "email-resend@example.com", "phone": "9123456780"},
+            format="json",
+        )
+        challenge = VerificationChallenge.objects.get(pk=start.data["challenge_id"])
+        challenge.email_resend_after = timezone.now() - timedelta(seconds=1)
+        challenge.save(update_fields=["email_resend_after"])
+
+        resent = self.client.post(
+            "/api/registrations/verification/resend/",
+            {"challenge_id": start.data["challenge_id"], "channel": "email"},
+            format="json",
+        )
+        self.assertEqual(resent.status_code, 200, resent.data)
+        self.assertEqual(re.search(r"\b\d{6}\b", mail.outbox[-1].body).group(), "333333")
+
+        old_code = self.client.post(
+            "/api/registrations/verification/verify/",
+            {
+                "challenge_id": start.data["challenge_id"],
+                "channel": "email",
+                "otp": "111111",
+            },
+            format="json",
+        )
+        new_code = self.client.post(
+            "/api/registrations/verification/verify/",
+            {
+                "challenge_id": start.data["challenge_id"],
+                "channel": "email",
+                "otp": "333333",
+            },
+            format="json",
+        )
+
+        self.assertEqual(old_code.status_code, 400)
+        self.assertEqual(new_code.status_code, 200, new_code.data)
+        self.assertNotIn("333333", json.dumps(resent.data))
+        send_sms.assert_called_once()
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
+    @patch("registrations.views._new_otp", side_effect=["111111", "222222", "333333"])
+    @patch("registrations.views.send_mobile_otp")
+    def test_mobile_resend_invalidates_the_old_code_and_accepts_the_new_code(
+        self, send_sms, _new_otp
+    ):
+        start = self.client.post(
+            "/api/registrations/verification/start/",
+            {"email": "mobile-resend@example.com", "phone": "9123456780"},
+            format="json",
+        )
+        challenge = VerificationChallenge.objects.get(pk=start.data["challenge_id"])
+        challenge.phone_resend_after = timezone.now() - timedelta(seconds=1)
+        challenge.save(update_fields=["phone_resend_after"])
+
+        resent = self.client.post(
+            "/api/registrations/verification/resend/",
+            {"challenge_id": start.data["challenge_id"], "channel": "mobile"},
+            format="json",
+        )
+        self.assertEqual(resent.status_code, 200, resent.data)
+        self.assertEqual(send_sms.call_args_list[-1].args[1], "333333")
+
+        old_code = self.client.post(
+            "/api/registrations/verification/verify/",
+            {
+                "challenge_id": start.data["challenge_id"],
+                "channel": "mobile",
+                "otp": "222222",
+            },
+            format="json",
+        )
+        new_code = self.client.post(
+            "/api/registrations/verification/verify/",
+            {
+                "challenge_id": start.data["challenge_id"],
+                "channel": "mobile",
+                "otp": "333333",
+            },
+            format="json",
+        )
+
+        self.assertEqual(old_code.status_code, 400)
+        self.assertEqual(new_code.status_code, 200, new_code.data)
+        self.assertNotIn("333333", json.dumps(resent.data))
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+        OTP_RESEND_COOLDOWN_SECONDS=60,
+    )
+    @patch("registrations.views.send_mobile_otp")
+    @patch("registrations.views.send_email_otp")
+    def test_resend_delivery_failure_preserves_code_and_enforces_cooldown(
+        self, send_email, send_sms
+    ):
+        send_email.side_effect = [
+            None,
+            VerificationDeliveryError("SMTP unavailable"),
+        ]
+        start = self.client.post(
+            "/api/registrations/verification/start/",
+            {"email": "resend-failure@example.com", "phone": "9123456780"},
+            format="json",
+        )
+        challenge = VerificationChallenge.objects.get(pk=start.data["challenge_id"])
+        original_hash = challenge.email_otp_hash
+        challenge.email_resend_after = timezone.now() - timedelta(seconds=1)
+        challenge.save(update_fields=["email_resend_after"])
+
+        failed = self.client.post(
+            "/api/registrations/verification/resend/",
+            {"challenge_id": start.data["challenge_id"], "channel": "email"},
+            format="json",
+        )
+
+        self.assertEqual(failed.status_code, 503)
+        self.assertEqual(failed.data["detail"], "SMTP unavailable")
+        self.assertEqual(failed.data["resend_after"], 60)
+        challenge.refresh_from_db()
+        self.assertEqual(challenge.email_otp_hash, original_hash)
+        self.assertGreater(challenge.email_resend_after, timezone.now())
+        send_sms.assert_called_once()
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
+    @patch("registrations.views.send_mobile_otp")
+    def test_resend_rejects_an_expired_challenge(self, send_sms):
+        start = self.client.post(
+            "/api/registrations/verification/start/",
+            {"email": "expired-resend@example.com", "phone": "9123456780"},
+            format="json",
+        )
+        challenge = VerificationChallenge.objects.get(pk=start.data["challenge_id"])
+        challenge.expires_at = timezone.now() - timedelta(seconds=1)
+        challenge.save(update_fields=["expires_at"])
+
+        resent = self.client.post(
+            "/api/registrations/verification/resend/",
+            {"challenge_id": start.data["challenge_id"], "channel": "email"},
+            format="json",
+        )
+
+        self.assertEqual(resent.status_code, 400)
+        self.assertIn("expired", resent.data["detail"].lower())
+        verify = self.client.post(
+            "/api/registrations/verification/verify/",
+            {
+                "challenge_id": start.data["challenge_id"],
+                "channel": "email",
+                "otp": "123456",
+            },
+            format="json",
+        )
+        self.assertEqual(verify.status_code, 400)
+        self.assertIn("expired", verify.data["detail"].lower())
+        send_sms.assert_called_once()
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
+    @patch("registrations.views._new_otp", side_effect=["111111", "222222", "333333", "444444"])
+    @patch("registrations.views.send_mobile_otp")
+    def test_restored_challenge_can_resend_both_codes(
+        self, send_sms, _new_otp
+    ):
+        start = self.client.post(
+            "/api/registrations/verification/start/",
+            {"email": "restore-resend@example.com", "phone": "9123456780"},
+            format="json",
+        )
+        challenge = VerificationChallenge.objects.get(pk=start.data["challenge_id"])
+        challenge.email_resend_after = timezone.now() - timedelta(seconds=1)
+        challenge.phone_resend_after = timezone.now() - timedelta(seconds=1)
+        challenge.save(update_fields=["email_resend_after", "phone_resend_after"])
+
+        restored = self.client.post(
+            "/api/registrations/verification/start/",
+            {"email": "restore-resend@example.com", "phone": "9123456780"},
+            format="json",
+        )
+        self.assertEqual(restored.status_code, 200, restored.data)
+        self.assertEqual(restored.data["challenge_id"], start.data["challenge_id"])
+        self.assertTrue(restored.data["verification_in_progress"])
+
+        email_resend = self.client.post(
+            "/api/registrations/verification/resend/",
+            {"challenge_id": start.data["challenge_id"], "channel": "email"},
+            format="json",
+        )
+        mobile_resend = self.client.post(
+            "/api/registrations/verification/resend/",
+            {"challenge_id": start.data["challenge_id"], "channel": "mobile"},
+            format="json",
+        )
+
+        self.assertEqual(email_resend.status_code, 200, email_resend.data)
+        self.assertEqual(mobile_resend.status_code, 200, mobile_resend.data)
+        self.assertEqual(re.search(r"\b\d{6}\b", mail.outbox[-1].body).group(), "333333")
+        self.assertEqual(send_sms.call_args_list[-1].args[1], "444444")
+
+        email_verified = self.client.post(
+            "/api/registrations/verification/verify/",
+            {
+                "challenge_id": start.data["challenge_id"],
+                "channel": "email",
+                "otp": "333333",
+            },
+            format="json",
+        )
+        mobile_verified = self.client.post(
+            "/api/registrations/verification/verify/",
+            {
+                "challenge_id": start.data["challenge_id"],
+                "channel": "mobile",
+                "otp": "444444",
+            },
+            format="json",
+        )
+        self.assertEqual(email_verified.status_code, 200, email_verified.data)
+        self.assertEqual(mobile_verified.status_code, 200, mobile_verified.data)
+        self.assertIn("verification_token", mobile_verified.data)
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
     @patch("registrations.views.send_mobile_otp")
     def test_restarting_an_active_challenge_does_not_reset_attempts_or_resend(self, send_sms):
         start = self.client.post(

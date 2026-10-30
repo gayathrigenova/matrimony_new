@@ -455,6 +455,20 @@
   color: #a32121;
 }
 
+.registration-resend-message {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.registration-resend-message.success {
+  color: #087c47;
+}
+
+.registration-resend-message.error {
+  color: #a32121;
+}
+
 .registration-verification-message.info {
   background: #eef4ff;
   color: #294d83;

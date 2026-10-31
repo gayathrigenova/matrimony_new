@@ -28,6 +28,10 @@ class VerificationChallenge(models.Model):
 
 class Registration(models.Model):
 
+    class Caste(models.TextChoices):
+        THIYYA = "Thiyya", "Thiyya"
+        EZHAVA = "Ezhava", "Ezhava"
+
     # =========================================================
     # STATUS
     # =========================================================
@@ -82,7 +86,8 @@ class Registration(models.Model):
 
     caste = models.CharField(
         max_length=100,
-        blank=True
+        blank=True,
+        choices=Caste.choices,
     )
 
     marital_status = models.CharField(

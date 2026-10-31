@@ -8,13 +8,13 @@ const plans = [
     btn: "Current Plan", featured: false,
   },
   {
-    name: "Gold Plan", price: "₹2,999", period: "/3 months",
-    features: ["View 50 Contact Numbers", "Unlimited Messaging", "Highlight Profile", "Priority Search", "✗ Dedicated Manager"],
+    name: "Gold Plan", price: "₹1499", period: "/3 months",
+    features: ["View 20 Contact Numbers", "Unlimited Messaging", "Highlight Profile", "Priority Search", "✗ Dedicated Manager"],
     btn: "Choose Gold", featured: true,
     badge: "Most Popular",
   },
   {
-    name: "Diamond Plan", price: "₹4,999", period: "/6 months",
+    name: "Diamond Plan", price: "₹3999", period: "/6 months",
     features: ["Unlimited Contacts", "Dedicated Relationship Manager", "Top Priority Placement", "Profile Verification Badge", "Personalised Matches"],
     btn: "Choose Diamond", featured: false,
   },

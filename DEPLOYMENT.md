@@ -23,15 +23,13 @@ applies migrations and starts Gunicorn. Set:
 - `ADMIN_NOTIFICATION_EMAIL`: destination for profile review notices.
 - `ADMIN_DASHBOARD_URL`: frontend origin used for admin review links.
 - `FRONTEND_URL`: frontend origin used in client emails.
-- `SMS_PROVIDER=twilio`: enables the Twilio SMS integration.
-- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and either
-  `TWILIO_FROM_NUMBER` or `TWILIO_MESSAGING_SERVICE_SID`: Twilio API credentials
-  and sender. Keep the auth token private and set these only in Railway
-  variables. `SMS_DEFAULT_COUNTRY_CODE` defaults to `+91` for local mobile
-  numbers; numbers already including `+` are sent as provided.
-- `OTP_EXPIRY_SECONDS` (default `600`), `OTP_RESEND_COOLDOWN_SECONDS`
+- `OTP_EXPIRY_SECONDS` (default `300`), `OTP_RESEND_COOLDOWN_SECONDS`
   (default `60`), and `OTP_MAX_ATTEMPTS` (default `5`): positive integer OTP
   policy values.
+- `MOBILE_OTP_MODE=console` enables backend-only mobile OTP generation for a
+  non-production test service. Codes are written to Django/Railway application
+  logs; this mode does not send SMS. Leave it unset or use `disabled` in
+  production. No SMS provider is integrated in this project.
 
 Keep `DEBUG` false in production. Attach a Railway Volume to the backend at
 `/app/media`; Django uses `RAILWAY_VOLUME_MOUNT_PATH` for `MEDIA_ROOT`. Without
@@ -91,6 +89,29 @@ commits. Configure SMTP and `ADMIN_NOTIFICATION_EMAIL` so these notifications
 reach their recipients; delivery failures are logged without undoing a saved
 registration or profile update.
 
+Mobile verification's console mode does not send SMS. For local testing in
+PowerShell, enable console mode and start Django:
+
+```powershell
+$env:MOBILE_OTP_MODE = "console"
+python manage.py runserver
+```
+
+The generated mobile OTP is logged to the Django development console, while
+only its hash is stored and the API never returns the code. OTPs expire after
+five minutes by default. A Railway test service can use `DEBUG=false` with
+`MOBILE_OTP_MODE=console` to write codes to Railway deployment logs. Enable this
+only on a non-production service; leave the mode `disabled` in production.
+
+Email settings are read from the Railway environment variables above. For
+Gmail, use `EMAIL_HOST=smtp.gmail.com`, `EMAIL_PORT=587`, `EMAIL_USE_TLS=true`,
+and `EMAIL_USE_SSL=false`; set `EMAIL_HOST_USER` to the full Gmail address and
+`EMAIL_HOST_PASSWORD` to a Google App Password (not the normal account
+password). `DEFAULT_FROM_EMAIL` should be that same verified address. Check the
+backend application logs for a credential-redacted SMTP exception name, status
+code, and server response when delivery fails. The application does not log
+SMTP credentials or return them in API errors.
+
 The registration flow first requests email and mobile codes, verifies each
 code, then passes the one-time verification token through the existing
 registration steps. OTP hashes are stored in the database; the codes are never
@@ -98,6 +119,7 @@ included in API responses. Deploy the `registrations.0011_verificationchallenge`
 migration together with the backend code, then rebuild/redeploy the frontend.
 The resend endpoint is `/api/registrations/verification/resend/`; it enforces
 the configured per-channel cooldown even when a provider delivery fails, and
-only replaces the stored OTP after the provider accepts the send request.
-Before production, test OTP delivery to a real email address and mobile number
-with the Railway SMTP and Twilio variables configured.
+only replaces the stored OTP after its delivery path completes successfully.
+Before production, test email OTP delivery with the Railway SMTP variables
+configured. Mobile verification stays disabled until an SMS provider is
+deliberately integrated.

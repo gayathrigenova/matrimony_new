@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { API_URL, readApiResponse } from "../api.js";
+import { CASTE_OPTIONS } from "../constants.js";
 import "./Registration.css";
 
 export default function Registration() {
@@ -165,6 +166,8 @@ export default function Registration() {
         challengeId: result.challenge_id,
         emailVerified: result.email_verified || false,
         mobileVerified: result.mobile_verified || false,
+        mobileDelivery: result.mobile_delivery,
+        emailDelivery: result.email_delivery,
         resendAfter: {
           email: now + result.resend_after.email * 1000,
           mobile: now + result.resend_after.mobile * 1000,
@@ -180,9 +183,21 @@ export default function Registration() {
       }
       setVerificationMessage({
         type: "success",
-        text: result.verification_in_progress
-          ? "Your existing verification request was restored. Resend either code if needed."
-          : "Verification codes sent to your email and mobile number.",
+        text: [
+          result.verification_in_progress
+            ? "Your existing verification request was restored."
+            : "",
+          result.email_delivery === "sent"
+            ? "The email code was sent."
+            : result.email_delivery === "console"
+              ? "The email code is available in the Django development console."
+              : "Email delivery status is unavailable; resend the email code.",
+          result.mobile_delivery === "development_console"
+            ? "The mobile code was generated; check the Django development console."
+            : result.mobile_delivery === "sent"
+              ? "The mobile code was sent."
+              : "Mobile delivery is unavailable.",
+        ].filter(Boolean).join(" "),
       });
     } catch (error) {
       setVerificationMessage({
@@ -206,6 +221,7 @@ export default function Registration() {
           challenge_id: verification.challengeId,
           channel,
           otp: otpValues[channel],
+          ...(channel === "mobile" ? { phone: formData.phone.trim() } : {}),
         }),
       });
       const result = await readApiResponse(response);
@@ -282,7 +298,7 @@ export default function Registration() {
         ...current,
         [channel]: {
           type: "success",
-          text: `A new code was sent to your ${channel}.`,
+          text: result.message || "The code was generated, but delivery status is unavailable.",
         },
       }));
     } catch (error) {
@@ -303,6 +319,15 @@ export default function Registration() {
 
   const minDateOfBirth = "1980-01-01";
   const maxDateOfBirth = "2010-12-31";
+  const expirySeconds = Math.max(
+    0,
+    verification
+      ? Math.ceil((verification.expiresAt - currentTime) / 1000)
+      : 0,
+  );
+  const formattedExpiry = `${Math.floor(expirySeconds / 60)}:${String(
+    expirySeconds % 60,
+  ).padStart(2, "0")}`;
 
   return (
     <div className="registration-page-wrapper">
@@ -507,30 +532,11 @@ export default function Registration() {
                   Select Caste
                 </option>
 
-                <option value="Thiyya">
-                  Thiyya
-                </option>
-
-                <option value="Nair">
-                  Nair
-                </option>
-
-                <option value="Ezhava">
-                  Ezhava
-                </option>
-
-                <option value="Brahmin">
-                  Brahmin
-                </option>
-
-                <option value="Muslim">
-                  Muslim
-                </option>
-
-                <option value="Christian">
-                  Christian
-                </option>
-
+                {CASTE_OPTIONS.map((caste) => (
+                  <option key={caste} value={caste}>
+                    {caste}
+                  </option>
+                ))}
               </select>
 
             </div>
@@ -659,8 +665,11 @@ export default function Registration() {
               <section className="registration-verification" aria-labelledby="verification-heading">
                 <h2 id="verification-heading">Verify your contact details</h2>
                 <p>
-                  Enter the separate six-digit codes sent to {formData.email} and {formData.phone}.
-                  {" "}Codes expire in {Math.max(0, Math.ceil((verification.expiresAt - currentTime) / 1000))} seconds.
+                  Enter the separate six-digit codes for {formData.email} and {formData.phone}.
+                  {" "}Codes expire in {formattedExpiry}.
+                  {verification.mobileDelivery === "development_console"
+                    ? " The mobile code is available in the Django development console."
+                    : ""}
                 </p>
                 {["email", "mobile"].map((channel) => {
                   const isEmail = channel === "email";
@@ -720,7 +729,7 @@ export default function Registration() {
                               }
                             >
                               {resending[channel]
-                                ? "Sending..."
+                                ? channel === "mobile" ? "Generating..." : "Sending..."
                                 : remaining > 0
                                   ? `Resend in ${remaining}s`
                                   : "Resend code"}
@@ -775,7 +784,7 @@ export default function Registration() {
               disabled={checkingEmail || (verification && !verificationToken)}
             >
               {checkingEmail
-                ? "Sending codes..."
+                ? "Preparing codes..."
                 : verificationToken
                   ? "CONTINUE"
                   : verification

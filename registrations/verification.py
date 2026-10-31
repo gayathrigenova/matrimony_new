@@ -1,10 +1,6 @@
-import base64
 import logging
 import re
 import smtplib
-from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
@@ -16,6 +12,28 @@ logger = logging.getLogger(__name__)
 
 class VerificationDeliveryError(Exception):
     pass
+
+
+def _safe_email_error(exc, email, otp):
+    response = getattr(exc, "smtp_error", None)
+    if isinstance(response, bytes):
+        response = response.decode("utf-8", errors="replace")
+    detail = str(response if response is not None else exc)
+    for secret in (
+        settings.EMAIL_HOST_PASSWORD,
+        settings.EMAIL_HOST_USER,
+        email,
+        otp,
+    ):
+        if secret:
+            detail = detail.replace(secret, "[redacted]")
+    detail = re.sub(
+        r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b",
+        "[redacted email]",
+        detail,
+    )
+    detail = re.sub(r"\b\d{6}\b", "[redacted code]", detail)
+    return detail[:500]
 
 
 def send_email_otp(email, otp):
@@ -56,7 +74,12 @@ def send_email_otp(email, otp):
         ImproperlyConfigured,
         ValueError,
     ) as exc:
-        logger.exception("Email OTP delivery failed.")
+        logger.error(
+            "Email OTP delivery failed: exception=%s smtp_code=%s detail=%s",
+            type(exc).__name__,
+            getattr(exc, "smtp_code", None),
+            _safe_email_error(exc, email, otp),
+        )
         raise VerificationDeliveryError(
             "The email verification code could not be sent. Please try again."
         ) from exc
@@ -65,80 +88,24 @@ def send_email_otp(email, otp):
         raise VerificationDeliveryError(
             "The email verification code could not be sent. Please try again."
         )
-
-
-def _format_phone_number(phone):
-    value = re.sub(r"[^\d+]", "", phone.strip())
-    if not value.startswith("+"):
-        country_code = settings.SMS_DEFAULT_COUNTRY_CODE.strip()
-        country_code = country_code if country_code.startswith("+") else f"+{country_code}"
-        value = f"{country_code}{value.lstrip('0')}"
-    if not re.fullmatch(r"\+[1-9]\d{7,14}", value):
-        raise VerificationDeliveryError(
-            "Enter a valid mobile number with its country code."
-        )
-    return value
+    return (
+        "console"
+        if settings.EMAIL_BACKEND.endswith("console.EmailBackend")
+        else "sent"
+    )
 
 
 def send_mobile_otp(phone, otp):
-    if settings.SMS_PROVIDER.lower() != "twilio":
-        raise VerificationDeliveryError(
-            "SMS delivery is not configured. Set SMS_PROVIDER=twilio and add "
-            "the Twilio credentials in Railway."
+    if settings.MOBILE_OTP_MODE != "console":
+        logger.error(
+            "Mobile verification is unavailable because SMS delivery is not configured."
         )
-    account_sid = settings.TWILIO_ACCOUNT_SID.strip()
-    auth_token = settings.TWILIO_AUTH_TOKEN.strip()
-    from_number = settings.TWILIO_FROM_NUMBER.strip()
-    messaging_service_sid = settings.TWILIO_MESSAGING_SERVICE_SID.strip()
-    if not account_sid or not auth_token or not (from_number or messaging_service_sid):
-        missing_settings = []
-        if not account_sid:
-            missing_settings.append("TWILIO_ACCOUNT_SID")
-        if not auth_token:
-            missing_settings.append("TWILIO_AUTH_TOKEN")
-        if not (from_number or messaging_service_sid):
-            missing_settings.append(
-                "TWILIO_FROM_NUMBER or TWILIO_MESSAGING_SERVICE_SID"
-            )
         raise VerificationDeliveryError(
-            "SMS delivery is not configured. Set "
-            + ", ".join(missing_settings)
-            + " in Railway."
+            "Mobile verification is unavailable because SMS delivery is not configured."
         )
-
-    expiry_minutes = max(1, settings.OTP_EXPIRY_SECONDS // 60)
-    payload = {
-        "To": _format_phone_number(phone),
-        "Body": (
-            f"Your Matrimony verification code is {otp}. "
-            f"It expires in {expiry_minutes} minutes."
-        ),
-    }
-    if messaging_service_sid:
-        payload["MessagingServiceSid"] = messaging_service_sid
-    else:
-        payload["From"] = from_number
-
-    credentials = base64.b64encode(
-        f"{account_sid}:{auth_token}".encode("utf-8")
-    ).decode("ascii")
-    request = Request(
-        f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json",
-        data=urlencode(payload).encode("ascii"),
-        headers={
-            "Authorization": f"Basic {credentials}",
-            "Content-Type": "application/x-www-form-urlencoded",
-        },
-        method="POST",
+    logger.warning(
+        "Development mobile verification code for phone ending in %s: %s",
+        phone[-4:],
+        otp,
     )
-    try:
-        with urlopen(request, timeout=15) as response:
-            if not 200 <= response.status < 300:
-                raise VerificationDeliveryError(
-                    "The mobile verification code could not be sent. Please try again."
-                )
-    except (HTTPError, URLError, TimeoutError, OSError) as exc:
-        logger.exception("Mobile OTP delivery failed.")
-        raise VerificationDeliveryError(
-            "The mobile verification code could not be sent. Please try again."
-        ) from exc
+    return "development_console"

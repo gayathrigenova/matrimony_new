@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { CASTE_OPTIONS } from '../constants.js';
 import './Search.css';
 
 export default function Search() {
@@ -51,7 +52,12 @@ export default function Search() {
             <div className="filter-group">
               <label>Caste</label>
               <select>
-                <option value="">Selected (0)</option>
+                <option value="">Select Caste</option>
+                {CASTE_OPTIONS.map((caste) => (
+                  <option key={caste} value={caste}>
+                    {caste}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

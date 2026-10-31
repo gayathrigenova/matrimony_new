@@ -329,7 +329,7 @@ EMAIL_BACKEND = (
     else "django.core.mail.backends.console.EmailBackend"
 )
 
-OTP_EXPIRY_SECONDS = int(os.getenv("OTP_EXPIRY_SECONDS", "600"))
+OTP_EXPIRY_SECONDS = int(os.getenv("OTP_EXPIRY_SECONDS", "300"))
 OTP_RESEND_COOLDOWN_SECONDS = int(os.getenv("OTP_RESEND_COOLDOWN_SECONDS", "60"))
 OTP_MAX_ATTEMPTS = int(os.getenv("OTP_MAX_ATTEMPTS", "5"))
 if min(OTP_EXPIRY_SECONDS, OTP_RESEND_COOLDOWN_SECONDS, OTP_MAX_ATTEMPTS) <= 0:
@@ -337,11 +337,13 @@ if min(OTP_EXPIRY_SECONDS, OTP_RESEND_COOLDOWN_SECONDS, OTP_MAX_ATTEMPTS) <= 0:
         "OTP expiry, resend cooldown, and attempt limit must be positive integers."
     )
 
-SMS_PROVIDER = os.getenv("SMS_PROVIDER", "twilio")
-SMS_DEFAULT_COUNTRY_CODE = os.getenv("SMS_DEFAULT_COUNTRY_CODE", "+91")
-TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID", "")
-TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
-TWILIO_FROM_NUMBER = os.getenv("TWILIO_FROM_NUMBER", "")
-TWILIO_MESSAGING_SERVICE_SID = os.getenv("TWILIO_MESSAGING_SERVICE_SID", "")
+MOBILE_OTP_MODE = os.getenv(
+    "MOBILE_OTP_MODE",
+    "console" if DEBUG else "disabled",
+).strip().lower()
+if MOBILE_OTP_MODE not in {"console", "disabled"}:
+    raise ImproperlyConfigured(
+        "MOBILE_OTP_MODE must be either 'console' or 'disabled'."
+    )
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

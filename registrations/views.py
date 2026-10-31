@@ -193,6 +193,16 @@ class VerificationStartView(APIView):
                     "email_verified": active_challenge.email_verified,
                     "mobile_verified": active_challenge.phone_verified,
                     "verification_in_progress": True,
+                    "mobile_delivery": (
+                        "development_console"
+                        if settings.MOBILE_OTP_MODE == "console"
+                        else "unavailable"
+                    ),
+                    "email_delivery": (
+                        "console"
+                        if settings.EMAIL_BACKEND.endswith("console.EmailBackend")
+                        else "sent"
+                    ),
                 }
                 if active_challenge.email_verified and active_challenge.phone_verified:
                     data["verification_token"] = str(active_challenge.pk)
@@ -229,12 +239,26 @@ class VerificationStartView(APIView):
             challenge.save()
 
         failures = []
+        email_delivery = None
+        mobile_delivery = None
         for channel, sender, target, otp in (
             ("email", send_email_otp, email, email_otp),
             ("mobile", send_mobile_otp, phone, phone_otp),
         ):
             try:
                 sender(target, otp)
+                if channel == "email":
+                    email_delivery = (
+                        "console"
+                        if settings.EMAIL_BACKEND.endswith("console.EmailBackend")
+                        else "sent"
+                    )
+                else:
+                    mobile_delivery = (
+                        "development_console"
+                        if settings.MOBILE_OTP_MODE == "console"
+                        else "unavailable"
+                    )
             except VerificationDeliveryError as exc:
                 logger.warning("Verification %s delivery failed: %s", channel, exc)
                 failures.append({"channel": channel, "detail": str(exc)})
@@ -245,24 +269,35 @@ class VerificationStartView(APIView):
             return Response(
                 {
                     "detail": (
-                        "Verification codes could not be delivered. Configure the "
-                        "listed email/SMS settings in Railway, then try again."
+                        "Verification could not be completed. Check the delivery "
+                        "details and try again."
                     ),
                     "delivery_errors": failures,
                 },
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
+        response_now = timezone.now()
         return Response(
             {
                 "challenge_id": str(challenge.pk),
-                "expires_in": settings.OTP_EXPIRY_SECONDS,
+                "expires_in": max(
+                    0,
+                    int((challenge.expires_at - response_now).total_seconds()),
+                ),
                 "resend_after": {
-                    "email": settings.OTP_RESEND_COOLDOWN_SECONDS,
-                    "mobile": settings.OTP_RESEND_COOLDOWN_SECONDS,
+                    "email": max(
+                        0,
+                        int((challenge.email_resend_after - response_now).total_seconds()),
+                    ),
+                    "mobile": max(
+                        0,
+                        int((challenge.phone_resend_after - response_now).total_seconds()),
+                    ),
                 },
-                "email_sent": True,
-                "mobile_sent": True,
+                "email_sent": email_delivery == "sent",
+                "email_delivery": email_delivery,
+                "mobile_delivery": mobile_delivery,
                 "email_verified": False,
                 "mobile_verified": False,
             },
@@ -277,9 +312,15 @@ class VerificationCodeView(APIView):
         challenge_id = request.data.get("challenge_id")
         channel = request.data.get("channel")
         otp = str(request.data.get("otp", "")).strip()
+        phone = str(request.data.get("phone", "")).strip()
         if channel not in ("email", "mobile") or not otp:
             return Response(
                 {"detail": "A verification channel and code are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if channel == "mobile" and not phone:
+            return Response(
+                {"phone": "The mobile number is required to verify this code."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         if len(otp) != 6 or not otp.isdigit():
@@ -294,6 +335,11 @@ class VerificationCodeView(APIView):
                     pk=challenge_id
                 )
                 now = timezone.now()
+                if channel == "mobile" and challenge.phone != phone:
+                    return Response(
+                        {"detail": "The mobile number does not match this verification request."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
                 if challenge.consumed_at or challenge.expires_at <= now:
                     return Response(
                         {"detail": "This verification request has expired. Request new codes."},
@@ -304,6 +350,11 @@ class VerificationCodeView(APIView):
                 verified_field = f"{field_channel}_verified"
                 attempts_field = f"{field_channel}_attempts"
                 hash_field = f"{field_channel}_otp_hash"
+                if getattr(challenge, verified_field):
+                    return Response(
+                        {"detail": "This verification code has already been used."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
                 attempts = getattr(challenge, attempts_field)
                 if attempts >= settings.OTP_MAX_ATTEMPTS:
                     return Response(
@@ -417,9 +468,37 @@ class VerificationResendView(APIView):
                         "expires_at",
                     ]
                 )
+                delivery_mode = (
+                    (
+                        "console"
+                        if settings.EMAIL_BACKEND.endswith("console.EmailBackend")
+                        else "sent"
+                    )
+                    if channel == "email"
+                    else (
+                        "development_console"
+                        if settings.MOBILE_OTP_MODE == "console"
+                        else "unavailable"
+                    )
+                )
                 return Response(
                     {
-                        "message": f"A new code was sent to your {channel}.",
+                        "message": (
+                            (
+                                "A new email verification code is available in the "
+                                "Django development console."
+                                if delivery_mode == "console"
+                                else "A new email verification code was sent."
+                            )
+                            if channel == "email"
+                            else (
+                                "A new mobile verification code was generated. "
+                                "Check the Django development console."
+                                if delivery_mode == "development_console"
+                                else "Mobile code delivery is unavailable."
+                            )
+                        ),
+                        "delivery": delivery_mode,
                         "expires_in": settings.OTP_EXPIRY_SECONDS,
                         "resend_after": settings.OTP_RESEND_COOLDOWN_SECONDS,
                     },

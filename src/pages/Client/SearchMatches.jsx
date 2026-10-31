@@ -1,4 +1,5 @@
 import { API_URL } from "../../api.js";
+import { CASTE_OPTIONS } from "../../constants.js";
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ClientLayout from "../../components/ClientLayout";
@@ -191,13 +192,18 @@ export default function SearchMatches() {
 
               <div className="filter-group">
                 <label>Caste</label>
-                <input
-                  type="text"
+                <select
                   name="caste"
-                  placeholder="e.g. Nair, Ezhava"
                   value={filters.caste}
                   onChange={handleFilterChange}
-                />
+                >
+                  <option value="">All Castes</option>
+                  {CASTE_OPTIONS.map((caste) => (
+                    <option key={caste} value={caste}>
+                      {caste}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="filter-group">
@@ -255,103 +261,6 @@ export default function SearchMatches() {
           </form>
         </div>
 
-        {/* RESULTS */}
-        {loading ? (
-          <div className="dashboard-loading">
-            <div className="loading-spinner"></div>
-            <p>Searching published profiles...</p>
-          </div>
-        ) : profiles.length === 0 ? (
-          <div className="empty-results-box">
-            <div className="empty-results-icon">👤</div>
-            <h3>No Profiles Found</h3>
-            <p>Try adjusting your search filters to view more published matches.</p>
-          </div>
-        ) : (
-          <div>
-            <div className="results-header">
-              Showing {profiles.length} Published Matches
-            </div>
-            <div className="matches-grid">
-              {profiles.map((profile) => (
-                <div key={profile.id} className="profile-card">
-                  <div className="profile-card-top">
-                    <div className="profile-card-image">
-                      {profile.profile_photo_url ? (
-                        <img src={profile.profile_photo_url} alt={profile.full_name} />
-                      ) : (
-                        profile.full_name?.charAt(0)?.toUpperCase() || "U"
-                      )}
-                    </div>
-                    <div className="profile-card-main-info">
-                      <h3 className="profile-card-name">{profile.full_name}</h3>
-                      <div className="profile-card-id">ID: {profile.matrimony_id || "WN-N/A"}</div>
-                      <div className="profile-card-tags">
-                        {profile.age && <span className="profile-tag">{profile.age} Yrs</span>}
-                        {profile.gender && <span className="profile-tag">{profile.gender}</span>}
-                        {profile.religion && <span className="profile-tag">{profile.religion}</span>}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="profile-card-details">
-                    <div className="card-detail-item">
-                      <span>Location</span>
-                      <strong>{profile.city || profile.district || "Not Specified"}</strong>
-                    </div>
-                    <div className="card-detail-item">
-                      <span>Education</span>
-                      <strong>{profile.education || profile.highest_education || "Not Specified"}</strong>
-                    </div>
-                    <div className="card-detail-item">
-                      <span>Occupation</span>
-                      <strong>{profile.occupation || "Not Specified"}</strong>
-                    </div>
-                    <div className="card-detail-item">
-                      <span>Caste</span>
-                      <strong>{profile.caste || "Not Specified"}</strong>
-                    </div>
-                  </div>
-
-                  {actionMessage.id === profile.id && (
-                    <div
-                      style={{
-                        padding: "8px 12px",
-                        fontSize: "12px",
-                        textAlign: "center",
-                        background: actionMessage.type === "success" ? "#f0fff4" : "#fff5f5",
-                        color: actionMessage.type === "success" ? "#276749" : "#c53030",
-                      }}
-                    >
-                      {actionMessage.text}
-                    </div>
-                  )}
-
-                  <div className="profile-card-actions">
-                    <button
-                      className="btn-card-action btn-card-view"
-                      onClick={() => navigate(`/search-matches/${profile.id}`)}
-                    >
-                      View Profile
-                    </button>
-                    <button
-                      className="btn-card-action btn-card-interest"
-                      onClick={() => handleSendInterest(profile.id)}
-                    >
-                      Send Interest
-                    </button>
-                    <button
-                      className="btn-card-action btn-card-shortlist"
-                      onClick={() => handleShortlist(profile.id)}
-                    >
-                      Shortlist
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </ClientLayout>
   );

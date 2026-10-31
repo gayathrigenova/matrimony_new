@@ -1,4 +1,5 @@
 import { API_URL, fetchWithTokenRefresh as fetchAuthenticatedRequest } from "../../api.js";
+import { CASTE_OPTIONS } from "../../constants.js";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ClientLayout from "../../components/ClientLayout";
@@ -359,12 +360,18 @@ export default function EditProfile() {
 
               <div className="form-group">
                 <label>Caste</label>
-                <input
-                  type="text"
+                <select
                   name="caste"
                   value={formData.caste}
                   onChange={handleChange}
-                />
+                >
+                  <option value="">Select Caste</option>
+                  {CASTE_OPTIONS.map((caste) => (
+                    <option key={caste} value={caste}>
+                      {caste}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="form-group">

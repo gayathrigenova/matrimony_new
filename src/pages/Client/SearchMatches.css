@@ -241,6 +241,22 @@
   background: white;
 }
 
+.profile-action-message {
+  padding: 8px 12px;
+  font-size: 12px;
+  text-align: center;
+}
+
+.profile-action-message.success {
+  background: #f0fff4;
+  color: #276749;
+}
+
+.profile-action-message.error {
+  background: #fff5f5;
+  color: #c53030;
+}
+
 .btn-card-action {
   flex: 1;
   padding: 8px 10px;

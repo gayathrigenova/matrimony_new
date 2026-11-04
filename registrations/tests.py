@@ -36,6 +36,50 @@ class RegistrationCasteValidationTests(TestCase):
             caste_field.run_validation("Nair")
 
 
+class RegistrationBirthStarTests(TestCase):
+    def test_birth_star_serializer_accepts_known_values_and_rejects_unknown_values(self):
+        birth_star_field = RegistrationSerializer().fields["birth_star"]
+
+        self.assertEqual(birth_star_field.run_validation("Ashwathi"), "Ashwathi")
+        self.assertEqual(birth_star_field.run_validation("Revathi"), "Revathi")
+        with self.assertRaises(ValidationError):
+            birth_star_field.run_validation("Unknown")
+
+    def test_published_profiles_can_be_filtered_by_birth_star(self):
+        matching_user = User.objects.create_user(email="star-match@example.com", password="pass123")
+        other_user = User.objects.create_user(email="other-star@example.com", password="pass123")
+        Registration.objects.create(
+            user=matching_user,
+            full_name="Matching Star",
+            gender="Female",
+            date_of_birth=date(1995, 1, 1),
+            birth_star="Ashwathi",
+            status=Registration.Status.PUBLISHED,
+        )
+        Registration.objects.create(
+            user=other_user,
+            full_name="Other Star",
+            gender="Female",
+            date_of_birth=date(1995, 1, 1),
+            birth_star="Revathi",
+            status=Registration.Status.PUBLISHED,
+        )
+
+        response = APIClient().get(
+            "/api/registrations/published/",
+            {"birth_star": "ashwathi"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        results = (
+            response.data.get("results", response.data)
+            if isinstance(response.data, dict)
+            else response.data
+        )
+        self.assertEqual([profile["full_name"] for profile in results], ["Matching Star"])
+        self.assertEqual(results[0]["birth_star"], "Ashwathi")
+
+
 class RegistrationDuplicateValidationTests(TestCase):
     def setUp(self):
         self.client = APIClient()

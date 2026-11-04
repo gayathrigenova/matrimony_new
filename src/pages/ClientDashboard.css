@@ -51,11 +51,11 @@
   width: 270px;
   min-width: 270px;
 
-  height: calc(100vh - 96px);
+  height: calc(100vh - 188px);
 
   position: fixed;
   left: 0;
-  top: 96px;
+  top: 188px;
 
   overflow: hidden;
   border-top-right-radius: 18px;
@@ -86,7 +86,7 @@
 .sidebar-nav {
   flex: 1;
 
-  padding: 30px 15px 22px;
+  padding: 16px 15px 16px;
 
   overflow-y: auto;
 }
@@ -170,101 +170,6 @@
   text-align: center;
 
   opacity: 0.9;
-}
-
-
-/* =========================================================
-   SIDEBAR BOTTOM
-========================================================= */
-
-.sidebar-bottom {
-  padding: 16px 18px 18px;
-}
-
-.help-card {
-  padding: 12px;
-
-  margin-bottom: 10px;
-
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 11px;
-
-  background: rgba(255, 255, 255, 0.08);
-
-  display: flex;
-
-  align-items: center;
-
-  gap: 10px;
-}
-
-.help-icon {
-  width: 29px;
-  height: 29px;
-
-  border-radius: 50%;
-
-  background: rgba(255, 255, 255, 0.13);
-
-  display: flex;
-
-  align-items: center;
-  justify-content: center;
-
-  color: white;
-
-  font-weight: 700;
-}
-
-.help-card strong,
-.help-card span {
-  display: block;
-}
-
-.help-card strong {
-  color: white;
-
-  font-size: 11px;
-}
-
-.help-card span {
-  margin-top: 2px;
-
-  color: rgba(255, 255, 255, 0.55);
-
-  font-size: 9px;
-}
-
-.sidebar-logout {
-  width: 100%;
-
-  height: 40px;
-
-  border: none;
-
-  border-radius: 10px;
-
-  background: rgba(255, 255, 255, 0.08);
-
-  color: rgba(255, 255, 255, 0.8);
-
-  display: flex;
-
-  align-items: center;
-
-  gap: 12px;
-
-  padding: 0 13px;
-
-  font-size: 12px;
-
-  cursor: pointer;
-}
-
-.sidebar-logout:hover {
-  background: rgba(255, 255, 255, 0.14);
-
-  color: white;
 }
 
 
@@ -1259,6 +1164,20 @@
 
 }
 
+@media (max-width: 1024px) {
+  .dashboard-sidebar {
+    top: 156px;
+    height: calc(100vh - 156px);
+  }
+}
+
+@media (max-width: 850px) {
+  .dashboard-sidebar {
+    top: 124px;
+    height: calc(100vh - 124px);
+  }
+}
+
 
 /* =========================================================
    MOBILE
@@ -1279,8 +1198,9 @@
 
     min-width: 235px;
     border-top-right-radius: 0;
-    top: 58px;
-    height: calc(100vh - 58px);
+    top: 124px;
+    height: calc(100vh - 124px);
+    max-height: none;
   }
 
   .dashboard-sidebar.sidebar-open {
@@ -1385,6 +1305,13 @@
 
   .correction-panel button {
     width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-sidebar {
+    top: 116px;
+    height: calc(100vh - 116px);
   }
 }
 

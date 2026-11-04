@@ -1,5 +1,5 @@
 import { API_URL } from "../../api.js";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ClientLayout from "../../components/ClientLayout";
 import "./Interests.css";
@@ -14,6 +14,8 @@ export default function Interests() {
   const [sentInterests, setSentInterests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [startingConversationId, setStartingConversationId] = useState(null);
+  const [conversationError, setConversationError] = useState(null);
 
   const token = localStorage.getItem("access_token");
 
@@ -110,6 +112,39 @@ export default function Interests() {
     } catch (err) {
       console.error("Interest update error:", err);
       alert(err.message);
+    }
+  };
+
+  const handleMessage = async (profileId) => {
+    setStartingConversationId(profileId);
+    setConversationError(null);
+
+    try {
+      const response = await fetch(
+        `${API_URL}/registrations/conversations/start/`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `******`,
+          },
+          body: JSON.stringify({ profile_id: profileId }),
+        },
+      );
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Could not open this conversation.");
+      }
+
+      navigate(`/messages?profile=${encodeURIComponent(profileId)}`);
+    } catch (err) {
+      setConversationError({
+        profileId,
+        text: err.message || "Could not open this conversation.",
+      });
+    } finally {
+      setStartingConversationId(null);
     }
   };
 
@@ -358,6 +393,19 @@ export default function Interests() {
 
                 <div className="interest-card-right">
 
+                  {activeTab === "received" && item.profile_id && (
+                    <button
+                      type="button"
+                      className="btn-message"
+                      onClick={() => handleMessage(item.profile_id)}
+                      disabled={startingConversationId !== null}
+                    >
+                      {startingConversationId === item.profile_id
+                        ? "Opening..."
+                        : "Message"}
+                    </button>
+                  )}
+
                   {/* =================================================
                       RECEIVED + PENDING
                   ================================================= */}
@@ -421,8 +469,13 @@ export default function Interests() {
                     </button>
                   )}
 
-                </div>
+                  {conversationError?.profileId === item.profile_id && (
+                    <p className="interest-message-error" role="alert">
+                      {conversationError.text}
+                    </p>
+                  )}
 
+                </div>
               </div>
             ))}
 

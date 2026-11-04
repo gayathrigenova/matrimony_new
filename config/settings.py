@@ -219,8 +219,8 @@ STORAGES = {
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = Path(
-    os.getenv("MEDIA_ROOT")
-    or os.getenv("RAILWAY_VOLUME_MOUNT_PATH")
+    os.getenv("RAILWAY_VOLUME_MOUNT_PATH")
+    or os.getenv("MEDIA_ROOT")
     or BASE_DIR / "media"
 )
 
@@ -322,11 +322,12 @@ if EMAIL_USE_TLS and EMAIL_USE_SSL:
     raise ImproperlyConfigured(
         "EMAIL_USE_TLS and EMAIL_USE_SSL cannot both be enabled."
     )
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "webmaster@localhost")
-EMAIL_BACKEND = (
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
+EMAIL_BACKEND = os.getenv(
+    "EMAIL_BACKEND",
     "django.core.mail.backends.smtp.EmailBackend"
     if EMAIL_HOST or os.getenv("RAILWAY_ENVIRONMENT")
-    else "django.core.mail.backends.console.EmailBackend"
+    else "django.core.mail.backends.console.EmailBackend",
 )
 
 OTP_EXPIRY_SECONDS = int(os.getenv("OTP_EXPIRY_SECONDS", "300"))
@@ -336,6 +337,22 @@ if min(OTP_EXPIRY_SECONDS, OTP_RESEND_COOLDOWN_SECONDS, OTP_MAX_ATTEMPTS) <= 0:
     raise ImproperlyConfigured(
         "OTP expiry, resend cooldown, and attempt limit must be positive integers."
     )
+
+SMS_PROVIDER = os.getenv("SMS_PROVIDER", "").strip().lower()
+if SMS_PROVIDER not in {"", "disabled", "twilio", "http"}:
+    raise ImproperlyConfigured(
+        "SMS_PROVIDER must be 'twilio', 'http', or 'disabled'."
+    )
+SMS_API_URL = os.getenv("SMS_API_URL", "").strip()
+SMS_API_KEY = os.getenv("SMS_API_KEY", "")
+SMS_API_KEY_HEADER = os.getenv("SMS_API_KEY_HEADER", "Authorization").strip()
+SMS_API_KEY_PREFIX = os.getenv("SMS_API_KEY_PREFIX", "Bearer").strip()
+SMS_SENDER_ID = os.getenv("SMS_SENDER_ID", "").strip()
+SMS_TIMEOUT = int(os.getenv("SMS_TIMEOUT", "10"))
+SMS_DEFAULT_COUNTRY_CODE = os.getenv("SMS_DEFAULT_COUNTRY_CODE", "+91").strip()
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID", "").strip()
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
+TWILIO_FROM_NUMBER = os.getenv("TWILIO_FROM_NUMBER", "").strip()
 
 MOBILE_OTP_MODE = os.getenv(
     "MOBILE_OTP_MODE",

@@ -172,7 +172,7 @@ class ProfileReviewWorkflowTests(TestCase):
         self.assertFalse(photo.pending_photo)
         self.assertNotIn("pending_gallery", photo.photo.name)
 
-    def test_approval_reports_missing_pending_media_without_changing_review_state(self):
+    def test_missing_pending_photo_can_be_reuploaded_before_approval(self):
         image_bytes = BytesIO()
         Image.new("RGB", (2, 2), "blue").save(image_bytes, format="PNG")
         update = self.client_api.patch(
@@ -199,10 +199,63 @@ class ProfileReviewWorkflowTests(TestCase):
 
         self.assertEqual(approval.status_code, 409, approval.data)
         self.assertIn("pending upload files are missing", approval.data["detail"])
+        self.assertIn("re-upload the missing files", approval.data["detail"])
         self.registration.refresh_from_db()
         change.refresh_from_db()
         self.assertEqual(self.registration.status, Registration.Status.PUBLISHED)
         self.assertEqual(change.status, ProfileChange.Status.PENDING_REVIEW)
+
+        client_profile = self.client_api.get("/api/registrations/my-profile/")
+        self.assertEqual(client_profile.status_code, 200, client_profile.data)
+        self.assertTrue(client_profile.data["profile_photo_missing"])
+
+        replacement = self.client_api.patch(
+            "/api/registrations/my-profile/",
+            {
+                "profile_photo": SimpleUploadedFile(
+                    "replacement-profile.png",
+                    image_bytes.getvalue(),
+                    content_type="image/png",
+                )
+            },
+            format="multipart",
+        )
+        self.assertEqual(replacement.status_code, 200, replacement.data)
+        change.refresh_from_db()
+        self.assertTrue(
+            change.pending_profile_photo.storage.exists(
+                change.pending_profile_photo.name
+            )
+        )
+
+        client_profile = self.client_api.get("/api/registrations/my-profile/")
+        self.assertFalse(client_profile.data["profile_photo_missing"])
+        admin_detail = self.admin_api.get(
+            f"/api/adminpanel/registrations/{self.registration.pk}/"
+        )
+        self.assertEqual(admin_detail.status_code, 200, admin_detail.data)
+        self.assertIn(
+            f"/pending-files/profile-photo/{change.pk}/",
+            admin_detail.data["registration"]["profile_photo"],
+        )
+        pending_photo = self.admin_api.get(
+            f"/api/registrations/pending-files/profile-photo/{change.pk}/"
+        )
+        self.assertEqual(pending_photo.status_code, 200)
+        pending_photo.close()
+
+        approval = self.admin_api.post(
+            f"/api/adminpanel/registrations/{self.registration.pk}/approve/"
+        )
+        self.assertEqual(approval.status_code, 200, approval.data)
+        self.registration.refresh_from_db()
+        change.refresh_from_db()
+        self.assertEqual(change.status, ProfileChange.Status.APPROVED)
+        self.assertTrue(
+            self.registration.profile_photo.storage.exists(
+                self.registration.profile_photo.name
+            )
+        )
 
     def test_approval_skips_gallery_photos_without_pending_uploads(self):
         image_bytes = BytesIO()

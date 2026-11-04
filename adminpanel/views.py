@@ -240,7 +240,14 @@ class AdminApproveRegistrationView(APIView):
                     pending_file = getattr(change, f"pending_{field}")
                     if pending_file:
                         pending_file.open("rb")
-                        getattr(registration, field).save(Path(pending_file.name).name, pending_file.file, save=False)
+                        try:
+                            getattr(registration, field).save(
+                                Path(pending_file.name).name,
+                                pending_file.file,
+                                save=False,
+                            )
+                        finally:
+                            pending_file.close()
                         pending_to_delete.append(pending_file)
                         setattr(change, f"pending_{field}", None)
                 registration.status = (
@@ -249,7 +256,14 @@ class AdminApproveRegistrationView(APIView):
                 for photo in pending_gallery_photos(registration):
                     pending_file = photo.pending_photo
                     pending_file.open("rb")
-                    photo.photo.save(Path(pending_file.name).name, pending_file.file, save=False)
+                    try:
+                        photo.photo.save(
+                            Path(pending_file.name).name,
+                            pending_file.file,
+                            save=False,
+                        )
+                    finally:
+                        pending_file.close()
                     photo.pending_photo = None
                     photo.status = photo.Status.APPROVED
                     photo.save()

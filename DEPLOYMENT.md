@@ -31,11 +31,34 @@ applies migrations and starts Gunicorn. Set:
   logs; this mode does not send SMS. Leave it unset or use `disabled` in
   production. No SMS provider is integrated in this project.
 
-Keep `DEBUG` false in production. Attach a Railway Volume to the backend at
-`/app/media`; Django uses `RAILWAY_VOLUME_MOUNT_PATH` for `MEDIA_ROOT`. Without
-a mounted volume, uploaded files can disappear on redeploy. Existing ephemeral
-uploads need to be copied to the volume or uploaded again. Public profile images
-are served under `/media/profiles/`; pending uploads use authenticated API URLs.
+Keep `DEBUG` false in production. This repository is deployed from its root:
+Railway builds and starts `manage.py` and `config.wsgi` from that service root.
+For the current Railpack deployment, attach a Railway Volume to the backend
+service with mount path `/app/media` (the media directory under the app root).
+Railway sets `RAILWAY_VOLUME_MOUNT_PATH` to the mount path actually configured
+for the service; Django uses that value as `MEDIA_ROOT`, ahead of any manually
+configured `MEDIA_ROOT` fallback.
+The WSGI app refuses to start on Railway if the volume mount variable is absent,
+so uploads cannot silently continue on ephemeral container storage.
+
+In Railway, open the backend service's **Volumes** settings, add a volume, set
+its mount path to `/app/media`, and deploy. Confirm the deployment has
+`RAILWAY_VOLUME_MOUNT_PATH=/app/media` and that the volume is attached to the
+backend service (not the frontend). If the service root or container layout is
+customized, use the actual desired persistent directory as the Volume mount
+path instead of `/app/media`; Django will use the path Railway provides without
+requiring a code change. Do not separately set `MEDIA_ROOT` to a different
+directory.
+
+Without a mounted volume, uploaded files can disappear on redeploy. Existing
+database FileField names are not changed when media storage is configured.
+Files that have already disappeared from ephemeral storage cannot be recovered
+from the database and must be uploaded again; any files still available in the
+old service should be copied to the volume while that service is accessible.
+Public profile images are served under `/media/profiles/`; pending uploads use
+authenticated API URLs. The client Edit Profile page reports a missing saved
+profile photo and provides the existing upload field for replacing it. Approval
+continues to fail until all referenced pending files are present.
 
 The deployment command runs database migrations before startup. Confirm that
 `adminpanel.0002_profilechange` and `registrations.0009_unique_registration_phone`

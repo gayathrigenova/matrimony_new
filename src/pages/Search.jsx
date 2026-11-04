@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CASTE_OPTIONS } from '../constants.js';
+import { BIRTH_STAR_OPTIONS, CASTE_OPTIONS } from '../constants.js';
 import './Search.css';
 
 export default function Search() {
   const [nestId, setNestId] = useState('');
+  const [birthStar, setBirthStar] = useState('');
   const navigate = useNavigate();
 
   return (
@@ -88,24 +89,28 @@ export default function Search() {
               </div>
             </div>
             <div className="filter-group">
-              <label>Matching Stars</label>
-              <select>
-                <option value="">Selected (0)</option>
-                <option>6+ Stars</option>
-                <option>8+ Stars</option>
-                <option>10+ Stars</option>
+              <label htmlFor="search-birth-star">Birth Star</label>
+              <select
+                id="search-birth-star"
+                value={birthStar}
+                onChange={(event) => setBirthStar(event.target.value)}
+              >
+                <option value="">select</option>
+                {BIRTH_STAR_OPTIONS.map((star) => (
+                  <option key={star} value={star}>{star}</option>
+                ))}
               </select>
             </div>
           </div>
-
+{/* 
           <div className="filter-more-link">
             <a href="#">More Filters</a>
-          </div>
+          </div> */}
 
           <button
             type="button"
             className="search-submit-btn"
-            onClick={() => navigate("/profiles")}
+            onClick={() => navigate(birthStar ? `/profiles?birth_star=${encodeURIComponent(birthStar)}` : "/profiles")}
           >
             Search
           </button>

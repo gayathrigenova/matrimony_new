@@ -1,5 +1,5 @@
 import { API_URL } from "../../api.js";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import ClientLayout from "../../components/ClientLayout";
 import "./ProfileDetails.css";
@@ -10,15 +10,15 @@ export default function ProfileDetails() {
   const navigate = useNavigate();
 
   const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loadedId, setLoadedId] = useState(null);
   const [error, setError] = useState("");
   const [actionFeedback, setActionFeedback] = useState({ type: "", text: "" });
+  const loading = loadedId !== id;
 
   const token = localStorage.getItem("access_token");
 
   useEffect(() => {
     if (!id) return;
-    setLoading(true);
 
     // Fetch published profile details
     fetch(`${API_URL}/registrations/published/${id}/`, {
@@ -50,7 +50,7 @@ export default function ProfileDetails() {
         setError(err.message || "Failed to load profile details.");
       })
       .finally(() => {
-        setLoading(false);
+        setLoadedId(id);
       });
   }, [id, token]);
 
@@ -183,6 +183,7 @@ export default function ProfileDetails() {
             <DetailItem label="Gender" value={profile.gender} />
             <DetailItem label="Religion" value={profile.religion} />
             <DetailItem label="Caste" value={profile.caste} />
+            <DetailItem label="Birth Star" value={profile.birth_star} />
             <DetailItem label="Marital Status" value={profile.marital_status} />
             <DetailItem label="Height" value={profile.height} />
             <DetailItem label="Disability" value={profile.disability} />

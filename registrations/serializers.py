@@ -6,7 +6,6 @@ from PIL import Image, UnidentifiedImageError
 
 from .models import (
     Registration,
-    VerificationChallenge,
     ProfileView,
     Interest,
     Shortlist,
@@ -68,7 +67,6 @@ class RegistrationSerializer(serializers.ModelSerializer):
         min_length=6
     )
 
-    verification_token = serializers.UUIDField(write_only=True)
 
     class Meta:
         model = Registration
@@ -81,6 +79,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
             "date_of_birth",
             "religion",
             "caste",
+            "birth_star",
             "marital_status",
             "height",
             "disability",
@@ -135,7 +134,6 @@ class RegistrationSerializer(serializers.ModelSerializer):
             "updated_at",
             "email",
             "password",
-            "verification_token",
         ]
 
         read_only_fields = [
@@ -183,53 +181,15 @@ class RegistrationSerializer(serializers.ModelSerializer):
         phone = attrs.get("phone")
         if not phone:
             raise serializers.ValidationError(
-                {"phone": "A verified mobile number is required."}
+                {"phone": "A mobile number is required."}
             )
-        challenge = VerificationChallenge.objects.filter(
-            pk=attrs["verification_token"],
-            email=attrs["email"],
-            phone=phone,
-            email_verified=True,
-            phone_verified=True,
-            consumed_at__isnull=True,
-            expires_at__gt=timezone.now(),
-        ).first()
-        if challenge is None:
-            raise serializers.ValidationError(
-                {
-                    "verification_token": (
-                        "Verify both your email and mobile number before completing registration."
-                    )
-                }
-            )
-        attrs["_verification_challenge"] = challenge
         return attrs
 
     def create(self, validated_data):
         email = validated_data.pop("email").strip().lower()
         password = validated_data.pop("password")
-        validated_data.pop("verification_token")
-        verification_challenge = validated_data.pop("_verification_challenge")
         try:
             with transaction.atomic():
-                challenge = VerificationChallenge.objects.select_for_update().get(
-                    pk=verification_challenge.pk
-                )
-                if (
-                    challenge.consumed_at
-                    or challenge.expires_at <= timezone.now()
-                    or not challenge.email_verified
-                    or not challenge.phone_verified
-                    or challenge.email != email
-                    or challenge.phone != validated_data.get("phone")
-                ):
-                    raise serializers.ValidationError(
-                        {
-                            "verification_token": (
-                                "The contact verification has expired or was already used. Verify both contacts again."
-                            )
-                        }
-                    )
                 user = User.objects.create_user(
                     email=email,
                     password=password,
@@ -237,8 +197,6 @@ class RegistrationSerializer(serializers.ModelSerializer):
                     role=User.Role.CLIENT,
                 )
                 registration = Registration.objects.create(user=user, **validated_data)
-                challenge.consumed_at = timezone.now()
-                challenge.save(update_fields=["consumed_at"])
                 transaction.on_commit(
                     lambda registration=registration: (
                         notify_registration_completed(registration),
@@ -276,6 +234,7 @@ class PublicProfileSerializer(serializers.ModelSerializer):
             "age",
             "religion",
             "caste",
+            "birth_star",
             "marital_status",
             "height",
             "disability",
@@ -342,6 +301,7 @@ class ClientProfileSerializer(serializers.ModelSerializer):
     additional_document_url = serializers.SerializerMethodField()
     pending_data = serializers.SerializerMethodField()
     pending_profile_photo_url = serializers.SerializerMethodField()
+    profile_photo_missing = serializers.SerializerMethodField()
     pending_identity_document_url = serializers.SerializerMethodField()
     pending_additional_document_url = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
@@ -367,6 +327,7 @@ class ClientProfileSerializer(serializers.ModelSerializer):
             "age",
             "religion",
             "caste",
+            "birth_star",
             "marital_status",
             "height",
             "disability",
@@ -396,6 +357,7 @@ class ClientProfileSerializer(serializers.ModelSerializer):
             "additional_document_url",
             "pending_data",
             "pending_profile_photo_url",
+            "profile_photo_missing",
             "pending_identity_document_url",
             "pending_additional_document_url",
             "father_name",
@@ -437,6 +399,7 @@ class ClientProfileSerializer(serializers.ModelSerializer):
             "additional_document_url",
             "pending_data",
             "pending_profile_photo_url",
+            "profile_photo_missing",
             "pending_identity_document_url",
             "pending_additional_document_url",
             "status",
@@ -506,6 +469,15 @@ class ClientProfileSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         path = f"/api/registrations/pending-files/profile-photo/{change.pk}/"
         return request.build_absolute_uri(path) if request else path
+
+    def get_profile_photo_missing(self, obj):
+        change = self._pending_change(obj)
+        photo = (
+            change.pending_profile_photo
+            if change and change.pending_profile_photo
+            else obj.profile_photo
+        )
+        return bool(photo and not photo.storage.exists(photo.name))
 
     def _pending_file_url(self, obj, field):
         change = self._pending_change(obj)

@@ -111,6 +111,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .status-tag {
@@ -145,6 +147,34 @@
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
+}
+
+.btn-message {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-message:hover {
+  background: var(--primary-dark);
+}
+
+.btn-message:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.interest-message-error {
+  flex-basis: 100%;
+  margin: 0;
+  color: #c53030;
+  font-size: 12px;
+  text-align: right;
 }
 
 .btn-accept:hover { background: #2f855a; }

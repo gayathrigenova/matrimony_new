@@ -1,6 +1,6 @@
 import { API_URL } from "../../api.js";
-import { CASTE_OPTIONS } from "../../constants.js";
-import React, { useEffect, useState } from "react";
+import { BIRTH_STAR_OPTIONS, CASTE_OPTIONS } from "../../constants.js";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ClientLayout from "../../components/ClientLayout";
 import "./SearchMatches.css";
@@ -9,25 +9,27 @@ import "./SearchMatches.css";
 export default function SearchMatches() {
   const navigate = useNavigate();
   const [profiles, setProfiles] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [searchError, setSearchError] = useState("");
   const [actionMessage, setActionMessage] = useState({ id: null, type: "", text: "" });
 
   const [filters, setFilters] = useState({
     gender: "",
     age_from: "",
     age_to: "",
-    religion: "",
+    education: "",
     caste: "",
+    birth_star: "",
     marital_status: "",
     district: "",
-    education: "",
-    occupation: "",
   });
 
   const token = localStorage.getItem("access_token");
 
   const fetchMatches = (queryFilters = filters) => {
     setLoading(true);
+    setSearchError("");
     const queryParams = new URLSearchParams();
 
     Object.entries(queryFilters).forEach(([key, val]) => {
@@ -53,15 +55,14 @@ export default function SearchMatches() {
       })
       .catch((err) => {
         console.error("Fetch matches error:", err);
+        setSearchError(err.message || "Unable to fetch matching profiles.");
+        setProfiles([]);
       })
       .finally(() => {
+        setHasSearched(true);
         setLoading(false);
       });
   };
-
-  useEffect(() => {
-    fetchMatches();
-  }, []);
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -78,12 +79,11 @@ export default function SearchMatches() {
       gender: "",
       age_from: "",
       age_to: "",
-      religion: "",
+      education: "",
       caste: "",
+      birth_star: "",
       marital_status: "",
       district: "",
-      education: "",
-      occupation: "",
     };
     setFilters(emptyFilters);
     fetchMatches(emptyFilters);
@@ -180,12 +180,12 @@ export default function SearchMatches() {
               </div>
 
               <div className="filter-group">
-                <label>Religion</label>
+                <label>Education</label>
                 <input
                   type="text"
-                  name="religion"
-                  placeholder="e.g. Hindu, Christian"
-                  value={filters.religion}
+                  name="education"
+                  placeholder="e.g. B.Tech, MBA"
+                  value={filters.education}
                   onChange={handleFilterChange}
                 />
               </div>
@@ -202,6 +202,21 @@ export default function SearchMatches() {
                     <option key={caste} value={caste}>
                       {caste}
                     </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="filter-group">
+                <label htmlFor="search-matches-birth-star">Birth Star</label>
+                <select
+                  id="search-matches-birth-star"
+                  name="birth_star"
+                  value={filters.birth_star}
+                  onChange={handleFilterChange}
+                >
+                  <option value="">Any Birth Star</option>
+                  {BIRTH_STAR_OPTIONS.map((star) => (
+                    <option key={star} value={star}>{star}</option>
                   ))}
                 </select>
               </div>
@@ -226,28 +241,6 @@ export default function SearchMatches() {
                   onChange={handleFilterChange}
                 />
               </div>
-
-              <div className="filter-group">
-                <label>Education</label>
-                <input
-                  type="text"
-                  name="education"
-                  placeholder="e.g. B.Tech, MBA"
-                  value={filters.education}
-                  onChange={handleFilterChange}
-                />
-              </div>
-
-              <div className="filter-group">
-                <label>Occupation</label>
-                <input
-                  type="text"
-                  name="occupation"
-                  placeholder="e.g. Engineer, Doctor"
-                  value={filters.occupation}
-                  onChange={handleFilterChange}
-                />
-              </div>
             </div>
 
             <div className="filter-actions">
@@ -260,6 +253,106 @@ export default function SearchMatches() {
             </div>
           </form>
         </div>
+
+        {loading ? (
+          <div className="dashboard-loading" role="status">
+            <div className="loading-spinner"></div>
+            <p>Searching profiles...</p>
+          </div>
+        ) : searchError ? (
+          <div className="dashboard-error" role="alert">
+            <p>{searchError}</p>
+          </div>
+        ) : hasSearched && profiles.length === 0 ? (
+          <div className="empty-results-box">
+            <div className="empty-results-icon">👤</div>
+            <h3>No Profiles Found</h3>
+            <p>Try adjusting your search filters to find profiles.</p>
+          </div>
+        ) : hasSearched ? (
+          <div className="matches-grid">
+            {profiles.map((profile) => (
+              <div key={profile.id} className="profile-card">
+                <div className="profile-card-top">
+                  <div className="profile-card-image">
+                    {profile.profile_photo_url ? (
+                      <img src={profile.profile_photo_url} alt={profile.full_name} />
+                    ) : (
+                      profile.full_name?.charAt(0)?.toUpperCase() || "U"
+                    )}
+                  </div>
+                  <div className="profile-card-main-info">
+                    <h3 className="profile-card-name">{profile.full_name}</h3>
+                    <div className="profile-card-id">
+                      ID: {profile.matrimony_id || "WN-N/A"}
+                    </div>
+                    <div className="profile-card-tags">
+                      {profile.age && <span className="profile-tag">{profile.age} Yrs</span>}
+                      {profile.gender && <span className="profile-tag">{profile.gender}</span>}
+                      {profile.religion && <span className="profile-tag">{profile.religion}</span>}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="profile-card-details">
+                  <div className="card-detail-item">
+                    <span>Location</span>
+                    <strong>{profile.city || profile.district || "Not Specified"}</strong>
+                  </div>
+                  <div className="card-detail-item">
+                    <span>Education</span>
+                    <strong>{profile.education || profile.highest_education || "Not Specified"}</strong>
+                  </div>
+                  <div className="card-detail-item">
+                    <span>Occupation</span>
+                    <strong>{profile.occupation || "Not Specified"}</strong>
+                  </div>
+                  <div className="card-detail-item">
+                    <span>Caste</span>
+                    <strong>{profile.caste || "Not Specified"}</strong>
+                  </div>
+                  <div className="card-detail-item">
+                    <span>Birth Star</span>
+                    <strong>{profile.birth_star || "Not Specified"}</strong>
+                  </div>
+                </div>
+
+                {actionMessage.id === profile.id && (
+                  <div
+                    className={`profile-action-message ${actionMessage.type}`}
+                    role={actionMessage.type === "error" ? "alert" : "status"}
+                  >
+                    {actionMessage.text}
+                  </div>
+                )}
+
+                <div className="profile-card-actions">
+                  <button
+                    type="button"
+                    className="btn-card-action btn-card-view"
+                    onClick={() => navigate(`/search-matches/${profile.id}`)}
+                  >
+                    View Profile
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-card-action btn-card-interest"
+                    onClick={() => handleSendInterest(profile.id)}
+                  >
+                    Send Interest
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-card-action btn-card-shortlist"
+                    onClick={() => handleShortlist(profile.id)}
+                  >
+                    Shortlist
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
 
       </div>
     </ClientLayout>

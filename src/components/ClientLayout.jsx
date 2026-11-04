@@ -66,14 +66,6 @@ export default function ClientLayout({ children }) {
       });
   }, [token, navigate]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    localStorage.removeItem("user");
-    window.dispatchEvent(new Event("auth-change"));
-    navigate("/login");
-  };
-
   const isActive = (path) => {
     if (path === "/dashboard" && location.pathname === "/dashboard") return true;
     if (path !== "/dashboard" && location.pathname.startsWith(path)) return true;
@@ -173,17 +165,6 @@ export default function ClientLayout({ children }) {
           <p className="nav-heading second-heading">ACCOUNT</p>
 
           <button
-            className={`nav-item ${isActive("/photos") ? "active" : ""}`}
-            onClick={() => {
-              navigate("/photos");
-              setSidebarOpen(false);
-            }}
-          >
-            <span className="nav-icon">▧</span>
-            <span>My Photos</span>
-          </button>
-
-          <button
             className={`nav-item ${isActive("/settings") ? "active" : ""}`}
             onClick={() => {
               navigate("/settings");
@@ -194,22 +175,6 @@ export default function ClientLayout({ children }) {
             <span>Settings</span>
           </button>
         </nav>
-
-        {/* SIDEBAR BOTTOM */}
-        <div className="sidebar-bottom">
-          <div className="help-card">
-            <div className="help-icon">?</div>
-            <div>
-              <strong>Need Help?</strong>
-              <span>Contact our team</span>
-            </div>
-          </div>
-
-          <button className="sidebar-logout" onClick={handleLogout}>
-            <span>↪</span>
-            Logout
-          </button>
-        </div>
       </aside>
 
       {/* MAIN AREA */}

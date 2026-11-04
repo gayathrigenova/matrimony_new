@@ -146,6 +146,7 @@ export default function MyProfile() {
             <DetailItem label="Date of Birth" value={profile.date_of_birth} />
             <DetailItem label="Religion" value={profile.religion} />
             <DetailItem label="Caste" value={profile.caste} />
+            <DetailItem label="Birth Star" value={profile.birth_star} />
             <DetailItem label="Marital Status" value={profile.marital_status} />
             <DetailItem label="Height" value={profile.height} />
             <DetailItem label="Disability" value={profile.disability} />

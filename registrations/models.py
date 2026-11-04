@@ -16,6 +16,8 @@ class VerificationChallenge(models.Model):
     phone_verified = models.BooleanField(default=False)
     email_resend_after = models.DateTimeField()
     phone_resend_after = models.DateTimeField()
+    email_expires_at = models.DateTimeField()
+    phone_expires_at = models.DateTimeField()
     expires_at = models.DateTimeField()
     consumed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -31,6 +33,35 @@ class Registration(models.Model):
     class Caste(models.TextChoices):
         THIYYA = "Thiyya", "Thiyya"
         EZHAVA = "Ezhava", "Ezhava"
+
+    class BirthStar(models.TextChoices):
+        ASHWATHI = "Ashwathi", "Ashwathi"
+        BHARANI = "Bharani", "Bharani"
+        KARTHIKA = "Karthika", "Karthika"
+        ROHINI = "Rohini", "Rohini"
+        MAKAYIRAM = "Makayiram", "Makayiram"
+        THIRUVATHIRA = "Thiruvathira", "Thiruvathira"
+        PUNARTHAM = "Punartham", "Punartham"
+        POOYAM = "Pooyam", "Pooyam"
+        AAYILYAM = "Aayilyam", "Aayilyam"
+        MAKAM = "Makam", "Makam"
+        POORAM = "Pooram", "Pooram"
+        UTHRAM = "Uthram", "Uthram"
+        ATHAM = "Atham", "Atham"
+        CHITHIRA = "Chithira", "Chithira"
+        CHOTHI = "Chothi", "Chothi"
+        VISHAKHAM = "Vishakham", "Vishakham"
+        ANIZHAM = "Anizham", "Anizham"
+        THRIKKETTA = "Thrikketta", "Thrikketta"
+        MOOLAM = "Moolam", "Moolam"
+        POORADAM = "Pooradam", "Pooradam"
+        UTHRADAM = "Uthradam", "Uthradam"
+        THIRUVONAM = "Thiruvonam", "Thiruvonam"
+        AVITTAM = "Avittam", "Avittam"
+        CHATHAYAM = "Chathayam", "Chathayam"
+        POORURUTTATHI = "Pooruruttathi", "Pooruruttathi"
+        UTHRATTATHI = "Uthrattathi", "Uthrattathi"
+        REVATHI = "Revathi", "Revathi"
 
     # =========================================================
     # STATUS
@@ -88,6 +119,12 @@ class Registration(models.Model):
         max_length=100,
         blank=True,
         choices=Caste.choices,
+    )
+
+    birth_star = models.CharField(
+        max_length=20,
+        blank=True,
+        choices=BirthStar.choices,
     )
 
     marital_status = models.CharField(

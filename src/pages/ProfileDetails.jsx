@@ -57,6 +57,7 @@ export default function ProfileDetails() {
     ["Marital status", profile.marital_status],
     ["Religion", profile.religion],
     ["Caste", profile.caste],
+    ["Birth star", profile.birth_star],
     ["Location", location],
   ];
   const personalDetails = [

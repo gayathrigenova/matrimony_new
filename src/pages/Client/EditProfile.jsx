@@ -1,5 +1,5 @@
 import { API_URL, fetchWithTokenRefresh as fetchAuthenticatedRequest } from "../../api.js";
-import { CASTE_OPTIONS } from "../../constants.js";
+import { BIRTH_STAR_OPTIONS, CASTE_OPTIONS } from "../../constants.js";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ClientLayout from "../../components/ClientLayout";
@@ -16,7 +16,7 @@ export default function EditProfile() {
   const [message, setMessage] = useState({ type: "", text: "" });
   const [profilePhotoFailed, setProfilePhotoFailed] = useState(false);
   const [profilePhotoPreview, setProfilePhotoPreview] = useState("");
-  const [review, setReview] = useState({ status: "PENDING", correction: "", rejection: "", profilePhoto: "", identityDocument: "", additionalDocument: "" });
+  const [review, setReview] = useState({ status: "PENDING", correction: "", rejection: "", profilePhoto: "", profilePhotoMissing: false, identityDocument: "", additionalDocument: "" });
   const [uploads, setUploads] = useState({ profile_photo: null, identity_document: null, additional_document: null });
 
   const [formData, setFormData] = useState({
@@ -25,6 +25,7 @@ export default function EditProfile() {
     date_of_birth: "",
     religion: "",
     caste: "",
+    birth_star: "",
     marital_status: "",
     height: "",
     disability: "No",
@@ -111,6 +112,7 @@ export default function EditProfile() {
           correction: data.correction_reason || "",
           rejection: data.rejection_reason || "",
           profilePhoto: data.pending_profile_photo_url || data.profile_photo_url || "",
+          profilePhotoMissing: Boolean(data.profile_photo_missing),
           identityDocument: data.pending_identity_document_url || data.identity_document_url || "",
           additionalDocument: data.pending_additional_document_url || data.additional_document_url || "",
         });
@@ -121,6 +123,7 @@ export default function EditProfile() {
           date_of_birth: data.date_of_birth || "",
           religion: data.religion || "",
           caste: data.caste || "",
+          birth_star: data.birth_star || "",
           marital_status: data.marital_status || "",
           height: data.height || "",
           disability: data.disability || "No",
@@ -275,6 +278,12 @@ export default function EditProfile() {
           {review.rejection && <p>Admin decision: {review.rejection}</p>}
         </div>
 
+        {review.profilePhotoMissing && (
+          <div className="alert-message error" role="alert">
+            Your saved profile photo is missing from storage. Please upload it again below and click Save Changes. Admin review cannot continue until the replacement photo is available.
+          </div>
+        )}
+
         {message.text && (
           <div className={`alert-message ${message.type}`}>
             {message.text}
@@ -291,9 +300,9 @@ export default function EditProfile() {
                 alt="Selected profile photo preview"
                   onError={() => setProfilePhotoFailed(true)}
                 />
-              ) : review.profilePhoto?.includes("/pending-files/profile-photo/") ? (
+              ) : !review.profilePhotoMissing && review.profilePhoto?.includes("/pending-files/profile-photo/") ? (
                 <ProtectedImage src={review.profilePhoto} alt="Pending profile photo" />
-              ) : review.profilePhoto && !profilePhotoFailed ? (
+              ) : !review.profilePhotoMissing && review.profilePhoto && !profilePhotoFailed ? (
                 <img src={review.profilePhoto} alt="Current profile photo" onError={() => setProfilePhotoFailed(true)} />
               ) : (
                 <div className="edit-profile-photo-placeholder" aria-label="No profile photo">
@@ -370,6 +379,21 @@ export default function EditProfile() {
                     <option key={caste} value={caste}>
                       {caste}
                     </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="birth_star">Birth Star</label>
+                <select
+                  id="birth_star"
+                  name="birth_star"
+                  value={formData.birth_star}
+                  onChange={handleChange}
+                >
+                  <option value="">Select Birth Star</option>
+                  {BIRTH_STAR_OPTIONS.map((star) => (
+                    <option key={star} value={star}>{star}</option>
                   ))}
                 </select>
               </div>

@@ -14,7 +14,7 @@ const plans = [
     badge: "Most Popular",
   },
   {
-    name: "Diamond Plan", price: "₹3999", period: "/6 months",
+    name: "Diamond Plan", price: "₹2999", period: "/6 months",
     features: ["Unlimited Contacts", "Dedicated Relationship Manager", "Top Priority Placement", "Profile Verification Badge", "Personalised Matches"],
     btn: "Choose Diamond", featured: false,
   },
@@ -60,7 +60,7 @@ export default function Membership() {
       </div>
 
       {/* Trust Stats */}
-      <div className="mem-stats-section">
+      {/* <div className="mem-stats-section">
         {[
           { num: "5 Lakh+", label: "Registered Profiles" },
           { num: "10,000+", label: "Successful Marriages" },
@@ -72,10 +72,10 @@ export default function Membership() {
             <p>{s.label}</p>
           </div>
         ))}
-      </div>
+      </div> */}
 
       {/* Benefits with Image */}
-      <div className="mem-benefits-section">
+      {/* <div className="mem-benefits-section">
         <div className="mem-benefits-img">
           <img src="https://images.unsplash.com/photo-1583939003579-730e3918a45a?w=600&q=80" alt="Happy Couple" />
         </div>
@@ -89,7 +89,7 @@ export default function Membership() {
           ))}
           <button className="mem-btn-primary" style={{marginTop:'1.5rem', width:'auto', padding:'0.8rem 2rem'}}>Get Premium Now</button>
         </div>
-      </div>
+      </div> */}
 
       {/* Testimonials */}
       {/* <div className="mem-testimonials-section">

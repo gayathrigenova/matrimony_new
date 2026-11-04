@@ -1,15 +1,25 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { API_URL } from "../api.js";
 import "./Profile.css";
 
 export default function Profiles() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const birthStar = searchParams.get("birth_star") || "";
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [pendingAction, setPendingAction] = useState(null);
+  const [sentInterestIds, setSentInterestIds] = useState(() => new Set());
+  const [shortlistedProfileIds, setShortlistedProfileIds] = useState(() => new Set());
+  const [actionFeedback, setActionFeedback] = useState({ id: null, type: "", text: "" });
 
   useEffect(() => {
-    fetch(`${API_URL}/registrations/published/`)
+    const query = new URLSearchParams();
+    if (birthStar) query.set("birth_star", birthStar);
+    const queryString = query.toString();
+    fetch(`${API_URL}/registrations/published/${queryString ? `?${queryString}` : ""}`)
       .then(async (response) => {
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.detail || "Unable to load profiles.");
@@ -17,7 +27,58 @@ export default function Profiles() {
       })
       .catch((requestError) => setError(requestError.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [birthStar]);
+
+  const handleProfileAction = async (profileId, action) => {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+
+    const actionName = action === "interest" ? "Interest" : "Shortlist";
+    setPendingAction({ id: profileId, action });
+    setActionFeedback({ id: null, type: "", text: "" });
+
+    try {
+      const response = await fetch(`${API_URL}/registrations/${profileId}/${action}/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.detail || "Unable to send interest.");
+      }
+
+      if (action === "interest") {
+        setSentInterestIds((currentIds) => new Set(currentIds).add(profileId));
+      } else {
+        setShortlistedProfileIds((currentIds) => new Set(currentIds).add(profileId));
+      }
+      setActionFeedback({
+        id: profileId,
+        type: "success",
+        text: action === "interest"
+          ? "Interest sent successfully."
+          : "Profile added to shortlist.",
+      });
+    } catch (requestError) {
+      setActionFeedback({
+        id: profileId,
+        type: "error",
+        text: requestError.message || (
+          action === "interest"
+            ? "Unable to send interest."
+            : `Unable to add profile to ${actionName.toLowerCase()}.`
+        ),
+      });
+    } finally {
+      setPendingAction(null);
+    }
+  };
 
   return (
     <div className="profiles-page">
@@ -40,7 +101,39 @@ export default function Profiles() {
               {profile.age ? <p><strong>Age:</strong> {profile.age} years</p> : null}
               {profile.occupation ? <p><strong>Job:</strong> {profile.occupation}</p> : null}
               {profile.state ? <p><strong>State:</strong> {profile.state}</p> : null}
-              <Link to={`/profiles/${profile.id}`} className="view-btn">View Profile</Link>
+              {profile.birth_star ? <p><strong>Birth Star:</strong> {profile.birth_star}</p> : null}
+              {actionFeedback.id === profile.id ? (
+                <p className={`profile-action-feedback ${actionFeedback.type}`} role={actionFeedback.type === "error" ? "alert" : "status"}>
+                  {actionFeedback.text}
+                </p>
+              ) : null}
+              <div className="profile-card-actions">
+                <Link to={`/profiles/${profile.id}`} className="view-btn">View Profile</Link>
+                <button
+                  type="button"
+                  className="interest-btn"
+                  onClick={() => handleProfileAction(profile.id, "interest")}
+                  disabled={pendingAction !== null || sentInterestIds.has(profile.id)}
+                >
+                  {sentInterestIds.has(profile.id)
+                    ? "Interest Sent"
+                    : pendingAction?.id === profile.id && pendingAction.action === "interest"
+                      ? "Sending…"
+                      : "Send Interest"}
+                </button>
+                <button
+                  type="button"
+                  className="shortlist-btn"
+                  onClick={() => handleProfileAction(profile.id, "shortlist")}
+                  disabled={pendingAction !== null || shortlistedProfileIds.has(profile.id)}
+                >
+                  {shortlistedProfileIds.has(profile.id)
+                    ? "Shortlisted"
+                    : pendingAction?.id === profile.id && pendingAction.action === "shortlist"
+                      ? "Adding…"
+                      : "Shortlist"}
+                </button>
+              </div>
             </div>
           </article>
         ))}

@@ -302,6 +302,7 @@ export default function RegistrationReview() {
         />
         <Info label="Religion" value={data.religion} />
         <Info label="Caste" value={data.caste} />
+        <Info label="Birth Star" value={data.birth_star} />
         <Info
           label="Marital Status"
           value={data.marital_status}

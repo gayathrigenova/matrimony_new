@@ -94,10 +94,19 @@
   font-weight: 600;
 }
 
-.view-btn {
-  display: block;
-  text-align: center;
+.profile-card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
   margin-top: 12px;
+}
+
+.view-btn {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   padding: 10px;
   background: linear-gradient(135deg, #00ab5b, #010b05);
   color: white;
@@ -105,6 +114,63 @@
   border-radius: 8px;
   font-weight: 600;
   transition: 0.3s;
+}
+
+.interest-btn {
+  flex: 1;
+  padding: 10px;
+  background: #e5f5ec;
+  color: #075c35;
+  border: 1px solid #b8e3ca;
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.interest-btn:hover:not(:disabled) {
+  background: #d3efde;
+}
+
+.interest-btn:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.shortlist-btn {
+  flex: 1;
+  padding: 10px;
+  background: #fffaf0;
+  color: #744210;
+  border: 1px solid #feebc8;
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.shortlist-btn:hover:not(:disabled) {
+  background: #fff1cf;
+}
+
+.shortlist-btn:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.profile-action-feedback {
+  margin: 10px 0 0;
+  font-size: 13px;
+}
+
+.profile-action-feedback.success {
+  color: #075c35;
+}
+
+.profile-action-feedback.error {
+  color: #b42318;
 }
 
 .view-btn:hover {

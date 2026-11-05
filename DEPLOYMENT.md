@@ -38,8 +38,10 @@ service with mount path `/app/media` (the media directory under the app root).
 Railway sets `RAILWAY_VOLUME_MOUNT_PATH` to the mount path actually configured
 for the service; Django uses that value as `MEDIA_ROOT`, ahead of any manually
 configured `MEDIA_ROOT` fallback.
-The WSGI app refuses to start on Railway if the volume mount variable is absent,
-so uploads cannot silently continue on ephemeral container storage.
+If the volume mount variable is absent, the WSGI app logs a critical warning
+and starts with `/app/media` as its temporary media root. Media writes are
+rejected until Railway provides the mount path, so uploads are not silently
+saved to ephemeral container storage.
 
 In Railway, open the backend service's **Volumes** settings, add a volume, set
 its mount path to `/app/media`, and deploy. Confirm the deployment has

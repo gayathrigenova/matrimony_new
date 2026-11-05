@@ -205,7 +205,7 @@ else:
 
 STORAGES = {
     "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage"
+        "BACKEND": "config.storage.PersistentMediaStorage"
     },
     "staticfiles": {
         "BACKEND": STATICFILES_BACKEND
@@ -218,11 +218,12 @@ STORAGES = {
 # =========================================================
 
 MEDIA_URL = "/media/"
-MEDIA_ROOT = Path(
-    os.getenv("RAILWAY_VOLUME_MOUNT_PATH")
-    or os.getenv("MEDIA_ROOT")
-    or BASE_DIR / "media"
-)
+if os.getenv("RAILWAY_ENVIRONMENT"):
+    # Railway's configured mount path is authoritative. The default lets the
+    # service boot while a volume is being attached, but is not persistent.
+    MEDIA_ROOT = Path(os.getenv("RAILWAY_VOLUME_MOUNT_PATH") or "/app/media")
+else:
+    MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT") or BASE_DIR / "media")
 
 
 # =========================================================

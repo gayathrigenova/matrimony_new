@@ -2,6 +2,7 @@ import { API_URL, fetchWithTokenRefresh, readApiResponse } from "../../api.js";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import ClientLayout from "../../components/ClientLayout";
+import ProtectedImage from "../../components/ProtectedImage";
 import "./MyProfile.css";
 
 
@@ -98,7 +99,7 @@ export default function MyProfile() {
           <div className="profile-header-left">
             <div className="profile-header-avatar">
               {profile.profile_photo_url ? (
-                <img src={profile.profile_photo_url} alt={profile.full_name} />
+                <ProtectedImage src={profile.profile_photo_url} alt={profile.full_name} />
               ) : (
                 profile.full_name?.charAt(0)?.toUpperCase() || "U"
               )}

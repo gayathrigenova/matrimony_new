@@ -227,9 +227,21 @@ class ProfileReviewWorkflowTests(TestCase):
                 change.pending_profile_photo.name
             )
         )
+        self.assertEqual(change.status, ProfileChange.Status.PENDING_REVIEW)
+        self.registration.refresh_from_db()
+        self.assertEqual(self.registration.status, Registration.Status.PUBLISHED)
 
         client_profile = self.client_api.get("/api/registrations/my-profile/")
         self.assertFalse(client_profile.data["profile_photo_missing"])
+        self.assertIn(
+            f"/pending-files/profile-photo/{change.pk}/",
+            client_profile.data["profile_photo_url"],
+        )
+        client_pending_photo = self.client_api.get(
+            f"/api/registrations/pending-files/profile-photo/{change.pk}/"
+        )
+        self.assertEqual(client_pending_photo.status_code, 200)
+        client_pending_photo.close()
         admin_detail = self.admin_api.get(
             f"/api/adminpanel/registrations/{self.registration.pk}/"
         )
@@ -256,6 +268,36 @@ class ProfileReviewWorkflowTests(TestCase):
                 self.registration.profile_photo.name
             )
         )
+
+    def test_profile_photo_upload_reports_missing_railway_volume_without_saving_reference(self):
+        image_bytes = BytesIO()
+        Image.new("RGB", (2, 2), "green").save(image_bytes, format="PNG")
+        with patch.dict(
+            os.environ,
+            {
+                "RAILWAY_ENVIRONMENT": "production",
+                "RAILWAY_VOLUME_MOUNT_PATH": "",
+            },
+        ):
+            response = self.client_api.patch(
+                "/api/registrations/my-profile/",
+                {
+                    "profile_photo": SimpleUploadedFile(
+                        "profile.png",
+                        image_bytes.getvalue(),
+                        content_type="image/png",
+                    )
+                },
+                format="multipart",
+            )
+
+        self.assertEqual(response.status_code, 503, response.data)
+        self.assertIn("Railway Volume is not attached", response.data["detail"])
+        change = ProfileChange.objects.get(
+            registration=self.registration,
+            status=ProfileChange.Status.PENDING_REVIEW,
+        )
+        self.assertFalse(change.pending_profile_photo)
 
     def test_approval_skips_gallery_photos_without_pending_uploads(self):
         image_bytes = BytesIO()

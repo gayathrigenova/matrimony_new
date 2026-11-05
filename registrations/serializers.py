@@ -424,10 +424,20 @@ class ClientProfileSerializer(serializers.ModelSerializer):
     def get_profile_photo_url(self, obj):
         request = self.context.get("request")
         if obj.profile_photo:
-            url = obj.profile_photo.url
-            if request:
-                return request.build_absolute_uri(url)
-            return url
+            if obj.profile_photo.storage.exists(obj.profile_photo.name):
+                url = obj.profile_photo.url
+                if request:
+                    return request.build_absolute_uri(url)
+                return url
+
+        # Show a replacement privately while the missing published image is
+        # under review. Keep any existing published image visible until approval.
+        change = self._pending_change(obj)
+        if change and change.pending_profile_photo:
+            pending_photo = change.pending_profile_photo
+            if pending_photo.storage.exists(pending_photo.name):
+                path = f"/api/registrations/pending-files/profile-photo/{change.pk}/"
+                return request.build_absolute_uri(path) if request else path
         return None
 
     def get_horoscope_file_url(self, obj):

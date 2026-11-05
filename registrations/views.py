@@ -1095,18 +1095,38 @@ class MyProfileView(
                     changed.append({"field_name": key, "old_value": old_value, "new_value": value})
             change.pending_data = {**change.pending_data, **pending_data}
             replaced_pending_files = []
-            for field, value in files.items():
-                previous_file = getattr(change, f"pending_{field}")
-                if previous_file:
-                    replaced_pending_files.append(previous_file)
-                setattr(change, f"pending_{field}", value)
-                changed.append({"field_name": field, "new_value": value.name})
-            changed_by_field = {item["field_name"]: item for item in change.changed_fields}
-            for item in changed:
-                old = changed_by_field.get(item["field_name"], {})
-                changed_by_field[item["field_name"]] = {**old, **item}
-            change.changed_fields = list(changed_by_field.values())
-            change.save()
+            uploaded_files = []
+            try:
+                for field, value in files.items():
+                    pending_field = f"pending_{field}"
+                    previous_file = getattr(change, pending_field)
+                    if previous_file:
+                        replaced_pending_files.append(previous_file)
+                    file_field = getattr(change, pending_field)
+                    file_field.save(value.name, value, save=False)
+                    uploaded_files.append((file_field.storage, file_field.name))
+                    if not file_field.storage.exists(file_field.name):
+                        raise OSError(
+                            f"Uploaded {field.replace('_', ' ')} was not found in media storage after saving."
+                        )
+                    changed.append({"field_name": field, "new_value": value.name})
+                changed_by_field = {item["field_name"]: item for item in change.changed_fields}
+                for item in changed:
+                    old = changed_by_field.get(item["field_name"], {})
+                    changed_by_field[item["field_name"]] = {**old, **item}
+                change.changed_fields = list(changed_by_field.values())
+                with transaction.atomic():
+                    change.save()
+            except Exception:
+                for storage, name in uploaded_files:
+                    try:
+                        storage.delete(name)
+                    except Exception:
+                        logger.exception(
+                            "Failed to remove unreferenced profile upload %s after update failure.",
+                            name,
+                        )
+                raise
             for previous_file in replaced_pending_files:
                 transaction.on_commit(lambda file=previous_file: file.delete(save=False))
 

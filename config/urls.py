@@ -67,6 +67,13 @@ urlpatterns = [
     # Health check
     path("health/", health_check, name="health-check"),
 
+    # React admin routes must precede Django's /admin/ mount.
+    re_path(
+        r"^admin/(?:login|dashboard|view/\d+)/?$",
+        frontend,
+        name="admin-frontend",
+    ),
+
     # Django admin
     path("admin/", admin.site.urls),
 

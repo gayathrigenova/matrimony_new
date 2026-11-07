@@ -121,16 +121,6 @@ class AdminRegistrationDetailView(APIView):
                 if file_field:
                     stored_files.append((file_field.storage, file_field.name))
 
-        for change in ProfileChange.objects.filter(registration=registration):
-            for field_name in (
-                "pending_profile_photo",
-                "pending_identity_document",
-                "pending_additional_document",
-            ):
-                file_field = getattr(change, field_name)
-                if file_field:
-                    stored_files.append((file_field.storage, file_field.name))
-
         with transaction.atomic():
             registration.delete()
             if not Registration.objects.filter(user=user).exists():

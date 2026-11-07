@@ -130,6 +130,13 @@ class ProfileReviewWorkflowTests(TestCase):
         self.assertFalse(self.registration.profile_photo)
         self.assertEqual(response.data["status"], "UNDER_REVIEW")
         self.assertEqual(response.data["pending_data"]["full_name"], "Updated Client")
+        name_change = next(
+            item
+            for item in response.data["changed_fields"]
+            if item["field_name"] == "full_name"
+        )
+        self.assertEqual(name_change["old_value"], "Client User")
+        self.assertEqual(name_change["new_value"], "Updated Client")
         self.assertEqual(ProfileVerification.objects.get(client=self.client_user).status, "UNDER_REVIEW")
         self.assertTrue(ProfileChange.objects.filter(registration=self.registration, status="PENDING_REVIEW").exists())
 
@@ -146,6 +153,56 @@ class ProfileReviewWorkflowTests(TestCase):
         self.assertNotIn("pending_changes", self.registration.profile_photo.name)
         main_photo = ClientPhoto.objects.get(registration=self.registration, slot_index=1)
         self.assertEqual(main_photo.status, ClientPhoto.Status.APPROVED)
+
+    def test_email_change_is_staged_highlighted_and_applied_on_approval(self):
+        response = self.client_api.patch(
+            "/api/registrations/my-profile/",
+            {"email": "updated@example.com"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["status"], "UNDER_REVIEW")
+        self.assertEqual(self.client_user.email, "client@example.com")
+        email_change = next(
+            item
+            for item in response.data["changed_fields"]
+            if item["field_name"] == "email"
+        )
+        self.assertEqual(email_change["old_value"], "client@example.com")
+        self.assertEqual(email_change["new_value"], "updated@example.com")
+
+        detail = self.admin_api.get(
+            f"/api/adminpanel/registrations/{self.registration.pk}/"
+        )
+        self.assertEqual(detail.status_code, 200, detail.data)
+        self.assertTrue(
+            any(
+                item["field_name"] == "email"
+                for item in detail.data["pending_change"]["changed_fields"]
+            )
+        )
+
+        approval = self.admin_api.post(
+            f"/api/adminpanel/registrations/{self.registration.pk}/approve/"
+        )
+        self.assertEqual(approval.status_code, 200, approval.data)
+        self.client_user.refresh_from_db()
+        self.assertEqual(self.client_user.email, "updated@example.com")
+
+    def test_email_change_rejects_an_address_owned_by_another_account(self):
+        User.objects.create_user(email="taken@example.com", ******)
+
+        response = self.client_api.patch(
+            "/api/registrations/my-profile/",
+            {"email": "taken@example.com"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("email", response.data)
+        self.client_user.refresh_from_db()
+        self.assertEqual(self.client_user.email, "client@example.com")
 
     def test_pending_gallery_photo_is_private_and_published_on_approval(self):
         image_bytes = BytesIO()
@@ -293,11 +350,12 @@ class ProfileReviewWorkflowTests(TestCase):
 
         self.assertEqual(response.status_code, 503, response.data)
         self.assertIn("Railway Volume is not attached", response.data["detail"])
-        change = ProfileChange.objects.get(
-            registration=self.registration,
-            status=ProfileChange.Status.PENDING_REVIEW,
+        self.assertFalse(
+            ProfileChange.objects.filter(
+                registration=self.registration,
+                status=ProfileChange.Status.PENDING_REVIEW,
+            ).exists()
         )
-        self.assertFalse(change.pending_profile_photo)
 
     def test_approval_skips_gallery_photos_without_pending_uploads(self):
         image_bytes = BytesIO()
@@ -517,29 +575,46 @@ class ProfileReviewWorkflowTests(TestCase):
         self.assertTrue(gallery.data[1]["pending_photo_url"])
         self.assertEqual(gallery.data[2]["status"], "EMPTY")
 
-    def test_gallery_delete_route_removes_photo_and_keeps_next_main_photo_in_sync(self):
-        self.registration.status = Registration.Status.PENDING
-        self.registration.save(update_fields=["status"])
+    def test_gallery_delete_waits_for_review_and_keeps_next_main_photo_in_sync(self):
+        photos = []
         for slot_index, color in ((1, "red"), (2, "green")):
             image_bytes = BytesIO()
             Image.new("RGB", (2, 2), color).save(image_bytes, format="PNG")
-            response = self.client_api.post(
-                "/api/registrations/photos/upload/",
-                {
-                    "slot_index": str(slot_index),
-                    "photo": SimpleUploadedFile(
-                        f"photo-{slot_index}.png",
-                        image_bytes.getvalue(),
-                        content_type="image/png",
-                    ),
-                },
-                format="multipart",
+            photo = ClientPhoto.objects.create(
+                registration=self.registration,
+                slot_index=slot_index,
+                is_main=slot_index == 1,
+                status=ClientPhoto.Status.APPROVED,
             )
-            self.assertEqual(response.status_code, 200, response.data)
+            photo.photo.save(
+                f"photo-{slot_index}.png",
+                SimpleUploadedFile(
+                    f"photo-{slot_index}.png",
+                    image_bytes.getvalue(),
+                    content_type="image/png",
+                ),
+            )
+            photos.append(photo)
+
+        self.registration.profile_photo = photos[0].photo
+        self.registration.save(update_fields=["profile_photo", "updated_at"])
 
         response = self.client_api.delete("/api/registrations/photos/1/delete/")
         self.assertEqual(response.status_code, 200, response.data)
-        self.assertFalse(ClientPhoto.objects.filter(registration=self.registration, slot_index=1).exists())
+        first_photo = ClientPhoto.objects.get(registration=self.registration, slot_index=1)
+        self.assertTrue(first_photo.pending_delete)
+        self.assertTrue(first_photo.photo)
+
+        approval = self.admin_api.post(
+            f"/api/adminpanel/registrations/{self.registration.pk}/approve/"
+        )
+        self.assertEqual(approval.status_code, 200, approval.data)
+        self.assertFalse(
+            ClientPhoto.objects.filter(
+                registration=self.registration,
+                slot_index=1,
+            ).exists()
+        )
         self.registration.refresh_from_db()
         next_photo = ClientPhoto.objects.get(registration=self.registration, slot_index=2)
         self.assertEqual(self.registration.profile_photo.name, next_photo.photo.name)
@@ -557,6 +632,18 @@ class ProfileReviewWorkflowTests(TestCase):
         response = self.client_api.delete("/api/registrations/photos/1/delete/")
 
         self.assertEqual(response.status_code, 200, response.data)
+        self.registration.refresh_from_db()
+        self.assertTrue(self.registration.profile_photo)
+        self.assertTrue(
+            ClientPhoto.objects.get(
+                registration=self.registration,
+                slot_index=1,
+            ).pending_delete
+        )
+        approval = self.admin_api.post(
+            f"/api/adminpanel/registrations/{self.registration.pk}/approve/"
+        )
+        self.assertEqual(approval.status_code, 200, approval.data)
         self.registration.refresh_from_db()
         self.assertFalse(self.registration.profile_photo)
 

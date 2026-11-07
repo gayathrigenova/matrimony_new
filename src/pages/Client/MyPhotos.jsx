@@ -158,7 +158,7 @@ export default function MyPhotos() {
       <div className="my-photos-container">
         <div className="photos-header">
           <h1>My Photos</h1>
-          <p>Upload up to 4 photos to increase your profile interest rates.</p>
+          <p>Upload up to 4 photos to increase interest in your profile.</p>
         </div>
 
         <div className="photos-notice">
@@ -166,7 +166,7 @@ export default function MyPhotos() {
           <ul>
             <li>You can upload up to 4 high quality profile photos (Max 5MB each).</li>
             <li>Photo 1 is set as your Primary Main Profile Photo.</li>
-            <li>If your profile is already published, new or replaced photo uploads undergo admin review before replacing your live public photo.</li>
+            <li>Photo uploads, replacements, and removals are sent for admin review. Existing approved photos remain visible until approval.</li>
           </ul>
         </div>
 
@@ -219,13 +219,28 @@ export default function MyPhotos() {
                   <div className="photo-display-area">
                     {displayPhoto ? (
                       <>
-                        {slot.pending_photo_url ? (
+                        {slot.pending_photo_url && slot.photo_url ? (
+                          <div className="photo-change-preview">
+                            <div className="photo-preview-side">
+                              <img src={slot.photo_url} alt={`Current photo in slot ${slot.slot_index}`} />
+                              <span>Current</span>
+                            </div>
+                            <div className="photo-preview-side proposed">
+                              <ProtectedImage src={slot.pending_photo_url} alt={`Proposed photo for slot ${slot.slot_index}`} />
+                              <span>Proposed</span>
+                            </div>
+                          </div>
+                        ) : slot.pending_photo_url ? (
                           <ProtectedImage src={slot.pending_photo_url} alt={`Slot ${slot.slot_index}`} />
                         ) : (
                           <img src={displayPhoto} alt={`Slot ${slot.slot_index}`} />
                         )}
-                        {(slot.pending_photo_url || slot.status === "PENDING") && (
-                          <div className="pending-photo-overlay">⏳ Pending Admin Verification</div>
+                        {(slot.pending_delete || slot.pending_photo_url || slot.status === "PENDING") && (
+                          <div className="pending-photo-overlay">
+                            {slot.pending_delete
+                              ? "Photo removal pending approval — current photo remains visible"
+                              : "Proposed photo pending admin review"}
+                          </div>
                         )}
                       </>
                     ) : (
@@ -266,9 +281,9 @@ export default function MyPhotos() {
                         <button
                           className="btn-slot-action delete"
                           onClick={() => handlePhotoAction(slot.slot_index, "delete")}
-                          disabled={busy}
+                          disabled={busy || slot.pending_delete}
                         >
-                          Delete
+                          {slot.pending_delete ? "Removal Pending" : "Delete"}
                         </button>
                       </div>
                     )}

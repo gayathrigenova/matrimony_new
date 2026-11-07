@@ -146,6 +146,7 @@ export default function AdminDashboard() {
           ...registration,
 
           verification,
+          has_pending_changes: Boolean(item.has_pending_changes),
 
           verification_status: normalizedStatus,
 
@@ -607,6 +608,11 @@ export default function AdminDashboard() {
                               registration.dashboard_status
                             )}
                           </span>
+                          {registration.has_pending_changes && (
+                            <span className="profile-updated-indicator">
+                              Updated
+                            </span>
+                          )}
 
                         </td>
 

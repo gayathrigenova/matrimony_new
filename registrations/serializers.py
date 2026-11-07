@@ -294,6 +294,7 @@ class PublicProfileSerializer(serializers.ModelSerializer):
 
 class ClientProfileSerializer(serializers.ModelSerializer):
 
+    email = serializers.EmailField(required=False, write_only=True)
     age = serializers.SerializerMethodField()
     profile_photo_url = serializers.SerializerMethodField()
     horoscope_file_url = serializers.SerializerMethodField()
@@ -304,6 +305,8 @@ class ClientProfileSerializer(serializers.ModelSerializer):
     profile_photo_missing = serializers.SerializerMethodField()
     pending_identity_document_url = serializers.SerializerMethodField()
     pending_additional_document_url = serializers.SerializerMethodField()
+    pending_horoscope_file_url = serializers.SerializerMethodField()
+    changed_fields = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
 
     def validate_profile_photo(self, value):
@@ -360,6 +363,8 @@ class ClientProfileSerializer(serializers.ModelSerializer):
             "profile_photo_missing",
             "pending_identity_document_url",
             "pending_additional_document_url",
+            "pending_horoscope_file_url",
+            "changed_fields",
             "father_name",
             "father_occupation",
             "mother_name",
@@ -381,6 +386,7 @@ class ClientProfileSerializer(serializers.ModelSerializer):
             "country_code",
             "contact_phone",
             "extra_phone",
+            "email",
             "status",
             "correction_reason",
             "rejection_reason",
@@ -402,6 +408,8 @@ class ClientProfileSerializer(serializers.ModelSerializer):
             "profile_photo_missing",
             "pending_identity_document_url",
             "pending_additional_document_url",
+            "pending_horoscope_file_url",
+            "changed_fields",
             "status",
             "correction_reason",
             "rejection_reason",
@@ -453,6 +461,19 @@ class ClientProfileSerializer(serializers.ModelSerializer):
     def get_additional_document_url(self, obj):
         return self._client_file_url(obj, "client-additional-document")
 
+    def validate_email(self, value):
+        value = value.strip().lower()
+        if User.objects.filter(email__iexact=value).exclude(pk=self.instance.user_id).exists():
+            raise serializers.ValidationError(
+                "This email address is already registered. Please use a different email address."
+            )
+        return value
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["email"] = instance.user.email
+        return data
+
     def _client_file_url(self, obj, kind):
         request = self.context.get("request")
         if not getattr(obj, "identity_document" if "identity" in kind else "additional_document"):
@@ -466,7 +487,9 @@ class ClientProfileSerializer(serializers.ModelSerializer):
         ).first()
 
     def _latest_change(self, obj):
-        return obj.profile_changes.exclude(status="APPROVED").first()
+        return obj.profile_changes.exclude(
+            status__in=("APPROVED", "CANCELLED")
+        ).first()
 
     def get_pending_data(self, obj):
         change = self._pending_change(obj)
@@ -502,6 +525,62 @@ class ClientProfileSerializer(serializers.ModelSerializer):
 
     def get_pending_additional_document_url(self, obj):
         return self._pending_file_url(obj, "additional_document")
+
+    def get_pending_horoscope_file_url(self, obj):
+        change = self._pending_change(obj)
+        if not change or not change.pending_horoscope_file:
+            return None
+        request = self.context.get("request")
+        path = f"/api/registrations/pending-files/horoscope-file/{change.pk}/"
+        return request.build_absolute_uri(path) if request else path
+
+    def get_changed_fields(self, obj):
+        change = self._pending_change(obj)
+        if not change:
+            return []
+
+        request = self.context.get("request")
+
+        def absolute(url):
+            return request.build_absolute_uri(url) if request and url else url
+
+        def saved_file_url(file_field):
+            if not file_field or not file_field.storage.exists(file_field.name):
+                return None
+            return absolute(file_field.url)
+
+        result = []
+        for item in change.changed_fields:
+            delta = dict(item)
+            field_name = delta.get("field_name")
+            old_url = None
+            new_url = None
+
+            if field_name == "profile_photo":
+                old_url = saved_file_url(obj.profile_photo)
+                new_url = self.get_pending_profile_photo_url(obj)
+            elif field_name in ("identity_document", "additional_document"):
+                old_url = self._client_file_url(obj, f"client-{field_name.replace('_', '-')}")
+                new_url = self._pending_file_url(obj, field_name)
+            elif field_name == "horoscope_file":
+                old_url = absolute("/api/registrations/my-profile/horoscope/") if obj.horoscope_file else None
+                new_url = (
+                    self.get_pending_horoscope_file_url(obj)
+                    if change.pending_horoscope_file
+                    else None
+                )
+            elif field_name == "gallery_photo":
+                photo = obj.photos.filter(slot_index=delta.get("slot_index")).first()
+                old_url = saved_file_url(photo.photo) if photo else None
+                new_url = absolute(
+                    f"/api/registrations/pending-files/gallery-photo/{photo.pk}/"
+                ) if photo and photo.pending_photo else None
+
+            if old_url or new_url:
+                delta["old_value_url"] = old_url
+                delta["new_value_url"] = new_url
+            result.append(delta)
+        return result
 
     def get_status(self, obj):
         change = self._latest_change(obj)
@@ -733,6 +812,7 @@ class ClientPhotoSerializer(serializers.ModelSerializer):
             "slot_index",
             "is_main",
             "status",
+            "pending_delete",
             "photo_url",
             "pending_photo_url",
             "created_at",

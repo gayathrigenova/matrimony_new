@@ -50,7 +50,6 @@ export default function RegistrationDetails1() {
       !formData.highestEducation ||
       !formData.occupationLevel ||
       !formData.occupation ||
-      !formData.annualIncome ||
       !formData.workLocation ||
       !formData.workingPlace ||
       !formData.height
@@ -226,7 +225,7 @@ export default function RegistrationDetails1() {
 
             {/* Annual Income */}
             <div className="rd1-field">
-              <label htmlFor="annualIncome">Annual Income <span>*</span></label>
+              <label htmlFor="annualIncome">Annual Income</label>
 
               <input
                 type="text"
@@ -235,7 +234,6 @@ export default function RegistrationDetails1() {
                 placeholder="Enter Annual Income"
                 value={formData.annualIncome}
                 onChange={handleChange}
-                required
               />
             </div>
 

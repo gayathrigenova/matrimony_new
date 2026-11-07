@@ -77,6 +77,7 @@ class ProfileChange(models.Model):
         APPROVED = "APPROVED", "Approved"
         REJECTED = "REJECTED", "Rejected"
         CORRECTION_REQUIRED = "CORRECTION_REQUIRED", "Correction Required"
+        CANCELLED = "CANCELLED", "Cancelled"
 
     registration = models.ForeignKey(
         "registrations.Registration",
@@ -117,6 +118,10 @@ class ProfileChange(models.Model):
     pending_additional_document = models.FileField(
         upload_to="documents/pending_changes/", blank=True, null=True
     )
+    pending_horoscope_file = models.FileField(
+        upload_to="documents/pending_changes/", blank=True, null=True
+    )
+    pending_horoscope_delete = models.BooleanField(default=False)
 
     previous_status = models.CharField(
         max_length=30,

@@ -20,6 +20,7 @@ export default function EditProfile() {
   const [uploads, setUploads] = useState({ profile_photo: null, identity_document: null, additional_document: null });
 
   const [formData, setFormData] = useState({
+    email: "",
     full_name: "",
     gender: "",
     date_of_birth: "",
@@ -118,6 +119,7 @@ export default function EditProfile() {
         });
         setFormData((current) => ({
           ...current,
+          email: data.email || "",
           full_name: data.full_name || "",
           gender: data.gender || "",
           date_of_birth: data.date_of_birth || "",
@@ -236,7 +238,13 @@ export default function EditProfile() {
         }
         throw new Error(getApiErrorMessage(result, response.status));
       }
-      navigate("/profile?view=1", { state: { success: "Profile and uploads saved successfully." } });
+      navigate("/profile?view=1", {
+        state: {
+          success: result?.status === "UNDER_REVIEW"
+            ? "Your profile changes were submitted for admin review. Previously approved information remains active until approval."
+            : "No profile changes were detected.",
+        },
+      });
     } catch (err) {
       setMessage({ type: "error", text: err.message || "Failed to update profile." });
     } finally {
@@ -269,7 +277,7 @@ export default function EditProfile() {
         </div>
 
         <div className="workflow-notice">
-          ℹ️ <strong>Admin Verification Rule:</strong> If your profile is already published, modifying major details will place your profile under admin review for verification before changes are published.
+          ℹ️ <strong>Admin Verification Rule:</strong> Profile edits and uploaded files are submitted for admin review. Your previously approved information remains active until the changes are approved.
         </div>
 
         <div className="workflow-notice" role="status">
@@ -574,6 +582,11 @@ export default function EditProfile() {
               <div className="form-group">
                 <label>Phone Number</label>
                 <input type="text" name="phone" value={formData.phone} onChange={handleChange} />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="email">Email Address</label>
+                <input id="email" type="email" name="email" value={formData.email} onChange={handleChange} autoComplete="email" />
               </div>
 
               <div className="form-group">

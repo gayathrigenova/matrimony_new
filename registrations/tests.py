@@ -948,8 +948,13 @@ class AuthenticatedProfileApiTests(TestCase):
         )
         self.assertEqual(partial_update.status_code, 200, partial_update.data)
         self.registration.refresh_from_db()
-        self.assertEqual(self.registration.about, "Updated without replacing other fields")
+        self.assertEqual(self.registration.about, "Before partial update")
         self.assertEqual(self.registration.full_name, "API Test User")
+        self.assertEqual(partial_update.data["status"], "UNDER_REVIEW")
+        self.assertEqual(
+            partial_update.data["pending_data"]["about"],
+            "Updated without replacing other fields",
+        )
 
         image_data = BytesIO()
         Image.new("RGB", (2, 2), "blue").save(image_data, format="PNG")
@@ -966,8 +971,13 @@ class AuthenticatedProfileApiTests(TestCase):
         )
         self.assertEqual(image_update.status_code, 200, image_update.data)
         self.registration.refresh_from_db()
-        self.assertTrue(self.registration.profile_photo)
-        self.assertEqual(self.registration.about, "Updated without replacing other fields")
+        self.assertFalse(self.registration.profile_photo)
+        self.assertTrue(image_update.data["pending_profile_photo_url"])
+        self.assertEqual(self.registration.about, "Before partial update")
+        self.assertEqual(
+            image_update.data["pending_data"]["about"],
+            "Updated without replacing other fields",
+        )
 
     def test_horoscope_jpeg_upload_view_and_delete_are_owner_authenticated(self):
         image_data = BytesIO()
@@ -990,15 +1000,19 @@ class AuthenticatedProfileApiTests(TestCase):
         )
 
         self.assertEqual(upload_response.status_code, 200, upload_response.data)
-        self.assertTrue(upload_response.data["horoscope_file_url"].endswith(endpoint))
+        self.assertEqual(upload_response.data["status"], "UNDER_REVIEW")
+        self.assertIn(
+            "/pending-files/horoscope-file/",
+            upload_response.data["horoscope_file_url"],
+        )
         self.registration.refresh_from_db()
-        self.assertTrue(self.registration.horoscope_file)
+        self.assertFalse(self.registration.horoscope_file)
 
         profile_response = self.client.get("/api/registrations/my-profile/")
         self.assertEqual(profile_response.status_code, 200, profile_response.data)
-        self.assertTrue(profile_response.data["horoscope_file_url"].endswith(endpoint))
+        self.assertTrue(profile_response.data["pending_horoscope_file_url"])
 
-        file_response = self.client.get(endpoint)
+        file_response = self.client.get(profile_response.data["pending_horoscope_file_url"])
         self.assertEqual(file_response.status_code, 200)
         self.assertEqual(file_response["Content-Type"], "image/jpeg")
         self.assertTrue(b"".join(file_response.streaming_content).startswith(b"\xff\xd8"))
@@ -1008,6 +1022,7 @@ class AuthenticatedProfileApiTests(TestCase):
         self.assertEqual(delete_response.status_code, 200, delete_response.data)
         self.registration.refresh_from_db()
         self.assertFalse(self.registration.horoscope_file)
+        self.assertEqual(delete_response.data["status"], Registration.Status.PENDING)
 
     def test_horoscope_upload_rejects_non_jpeg_content(self):
         image_data = BytesIO()

@@ -4,6 +4,61 @@ import { useNavigate, useParams } from "react-router-dom";
 import ProtectedImage from "../../components/ProtectedImage";
 import ProtectedFileLink from "../../components/ProtectedFileLink";
 
+const CHANGE_FIELD_LABELS = {
+  full_name: "Full Name",
+  gender: "Gender",
+  date_of_birth: "Date of Birth",
+  religion: "Religion",
+  caste: "Caste",
+  birth_star: "Birth Star",
+  marital_status: "Marital Status",
+  height: "Height",
+  disability: "Disability",
+  address: "Address",
+  city: "City",
+  district: "District",
+  state: "State",
+  education_level: "Education Level",
+  education: "Education",
+  highest_education: "Highest Education",
+  occupation_level: "Occupation Level",
+  occupation: "Occupation",
+  company: "Company",
+  income: "Income",
+  work_location: "Work Location",
+  working_place: "Working Place",
+  phone: "Phone",
+  alternate_phone: "Alternate Phone",
+  email: "Email Address",
+  about: "About",
+  father_name: "Father's Name",
+  father_occupation: "Father's Occupation",
+  mother_name: "Mother's Name",
+  mother_occupation: "Mother's Occupation",
+  brothers: "Brothers",
+  married_brothers: "Married Brothers",
+  sisters: "Sisters",
+  married_sisters: "Married Sisters",
+  financial_level: "Financial Level",
+  about_family: "About Family",
+  place: "Native Place",
+  house_name: "House Name",
+  bus_stop: "Bus Stop",
+  post_office: "Post Office",
+  taluk: "Taluk",
+  village: "Village",
+  contact_name: "Contact Person",
+  relationship: "Relationship",
+  country_code: "Country Code",
+  contact_phone: "Contact Phone",
+  extra_phone: "Additional Phone",
+  profile_photo: "Profile Photo",
+  identity_document: "Identity Document",
+  additional_document: "Additional Document",
+  horoscope_file: "Horoscope",
+  gallery_photo: "Gallery Photo",
+};
+
 function clearAdminSession() {
   localStorage.removeItem("access_token");
   localStorage.removeItem("refresh_token");
@@ -227,6 +282,7 @@ export default function RegistrationReview() {
     verification.status ||
     data.status ||
     "PENDING";
+  const changedFields = registration.pending_change?.changed_fields || [];
 
   return (
     <div style={styles.page}>
@@ -288,6 +344,20 @@ export default function RegistrationReview() {
         </div>
 
       </div>
+
+      {changedFields.length > 0 && (
+        <Section title="Profile Changes Awaiting Review">
+          <div style={styles.changeNotice}>
+            The client's approved information remains unchanged until these proposed updates are approved.
+          </div>
+          {changedFields.map((change, index) => (
+            <ChangeComparison
+              key={`${change.field_name}-${change.slot_index ?? index}`}
+              change={change}
+            />
+          ))}
+        </Section>
+      )}
 
       {/* ======================================
           PERSONAL INFORMATION
@@ -390,6 +460,11 @@ export default function RegistrationReview() {
           CONTACT
       ======================================= */}
       <Section title="Contact Information">
+
+        <Info
+          label="Email Address"
+          value={data.email}
+        />
 
         <Info
           label="Phone"
@@ -726,6 +801,50 @@ function Document({ label, url }) {
   );
 }
 
+function ChangeComparison({ change }) {
+  const fieldName = change.field_name;
+  const label = fieldName === "gallery_photo"
+    ? `${CHANGE_FIELD_LABELS.gallery_photo} ${change.slot_index}`
+    : CHANGE_FIELD_LABELS[fieldName] || fieldName;
+  const isImage = fieldName === "profile_photo" || fieldName === "gallery_photo";
+  const isDocument = [
+    "identity_document",
+    "additional_document",
+    "horoscope_file",
+  ].includes(fieldName);
+
+  const value = (side) => {
+    const text = change[`${side}_value`];
+    const url = change[`${side}_value_url`];
+    if (url && isImage) {
+      return <ProtectedImage src={url} alt={`${side} ${label}`} style={styles.changeImage} />;
+    }
+    if (url && isDocument) {
+      return <ProtectedFileLink href={url}>{text || "View file"}</ProtectedFileLink>;
+    }
+    return text === null || text === undefined || text === ""
+      ? (side === "new" ? "Removed / not provided" : "Not provided")
+      : String(text);
+  };
+
+  return (
+    <div style={styles.changeItem}>
+      <strong style={styles.changeLabel}>{label}</strong>
+      <div style={styles.changeValues}>
+        <div>
+          <span style={styles.changeSideLabel}>Previous</span>
+          <del>{value("old")}</del>
+        </div>
+        <span style={styles.changeArrow} aria-hidden="true">→</span>
+        <div>
+          <span style={styles.changeSideLabel}>Proposed</span>
+          <strong style={styles.changeProposed}>{value("new")}</strong>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ==========================================
    STATUS HELPERS
 ========================================== */
@@ -821,6 +940,55 @@ const styles = {
     fontSize: "12px",
     color: "#7a8790",
     marginBottom: "6px",
+  },
+  changeNotice: {
+    gridColumn: "1 / -1",
+    padding: "12px 14px",
+    marginBottom: 8,
+    borderRadius: 6,
+    background: "#f0fff7",
+    color: "#075c35",
+    fontSize: 13,
+  },
+  changeItem: {
+    gridColumn: "1 / -1",
+    padding: 14,
+    border: "1px solid #dcebe2",
+    borderRadius: 6,
+    background: "#fff",
+  },
+  changeLabel: {
+    display: "block",
+    marginBottom: 10,
+    color: "#243b2e",
+  },
+  changeValues: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)",
+    alignItems: "center",
+    gap: 12,
+    overflowWrap: "anywhere",
+  },
+  changeSideLabel: {
+    display: "block",
+    marginBottom: 5,
+    color: "#718096",
+    fontSize: 10,
+    textTransform: "uppercase",
+  },
+  changeArrow: {
+    color: "#079455",
+    fontWeight: 700,
+  },
+  changeProposed: {
+    color: "#087442",
+  },
+  changeImage: {
+    display: "block",
+    width: "min(100%, 220px)",
+    height: 160,
+    borderRadius: 5,
+    objectFit: "cover",
   },
 
   matrimonyId: {

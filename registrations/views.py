@@ -76,6 +76,130 @@ def _changed_profile_fields(registration, values):
     return changed
 
 
+def _active_profile_change(registration, user):
+    change = registration.profile_changes.filter(
+        status__in=(
+            ProfileChange.Status.PENDING_REVIEW,
+            ProfileChange.Status.CORRECTION_REQUIRED,
+        )
+    ).order_by("-created_at").first()
+    if change:
+        return change
+    return ProfileChange(
+        registration=registration,
+        user=user,
+        previous_status=registration.status,
+    )
+
+
+def _profile_change_deltas(registration, change):
+    changed = []
+    for field, value in change.pending_data.items():
+        old_value = (
+            registration.user.email
+            if field == "email"
+            else getattr(registration, field, None)
+        )
+        if hasattr(old_value, "isoformat"):
+            old_value = old_value.isoformat()
+        changed.append({
+            "field_name": field,
+            "old_value": old_value,
+            "new_value": value,
+        })
+
+    for field in (
+        "profile_photo",
+        "identity_document",
+        "additional_document",
+        "horoscope_file",
+    ):
+        pending_file = getattr(change, f"pending_{field}")
+        if pending_file:
+            old_file = getattr(registration, field)
+            changed.append({
+                "field_name": field,
+                "old_value": old_file.name if old_file else None,
+                "new_value": pending_file.name,
+            })
+    if change.pending_horoscope_delete:
+        old_file = registration.horoscope_file
+        changed.append({
+            "field_name": "horoscope_file",
+            "old_value": old_file.name if old_file else None,
+            "new_value": None,
+        })
+
+    pending_photos = registration.photos.filter(
+        Q(pending_photo__isnull=False)
+        & ~Q(pending_photo="")
+        | Q(pending_delete=True)
+    )
+    for photo in pending_photos:
+        changed.append({
+            "field_name": "gallery_photo",
+            "slot_index": photo.slot_index,
+            "old_value": photo.photo.name if photo.photo else None,
+            "new_value": photo.pending_photo.name if photo.pending_photo else None,
+            "pending_delete": photo.pending_delete,
+        })
+    return changed
+
+
+def _submit_profile_change(registration, user, change):
+    previous_details = change.changed_fields
+    was_pending_review = (
+        bool(change.pk)
+        and change.status == ProfileChange.Status.PENDING_REVIEW
+    )
+    changed_fields = _profile_change_deltas(registration, change)
+    if not changed_fields:
+        change.changed_fields = []
+        return False
+    should_notify = not was_pending_review or previous_details != changed_fields
+    change.changed_fields = changed_fields
+    change.status = ProfileChange.Status.PENDING_REVIEW
+    change.correction_message = ""
+    change.rejection_reason = ""
+    change.save()
+
+    verification, _ = ProfileVerification.objects.get_or_create(client=user)
+    verification.status = ProfileVerification.Status.UNDER_REVIEW
+    verification.correction_message = ""
+    verification.rejection_reason = ""
+    verification.save(update_fields=[
+        "status",
+        "correction_message",
+        "rejection_reason",
+        "updated_at",
+    ])
+    if should_notify:
+        details = list(change.changed_fields)
+        transaction.on_commit(
+            lambda registration=registration, details=details: (
+                notify_profile_update(registration, details)
+            )
+        )
+    return True
+
+
+def _cancel_empty_profile_change(change, user):
+    if not change.pk:
+        return
+    change.status = ProfileChange.Status.CANCELLED
+    change.save(update_fields=["status", "updated_at"])
+    verification, _ = ProfileVerification.objects.get_or_create(client=user)
+    verification.status = (
+        ProfileVerification.Status.APPROVED
+        if change.previous_status in (
+            Registration.Status.APPROVED,
+            Registration.Status.PUBLISHED,
+        )
+        else change.previous_status
+    )
+    verification.save(update_fields=["status", "updated_at"])
+
+
 # =========================================================
 # USER REGISTRATION
 # =========================================================
@@ -1052,132 +1176,123 @@ class MyProfileView(
             )
 
     def perform_update(self, serializer):
-
-        registration = self.get_object()
-
-        old_status = registration.status
-        changed_fields = _changed_profile_fields(
-            registration, serializer.validated_data
-        )
-
-        # -------------------------------------------------
-        # PUBLISHED / APPROVED PROFILE EDIT
-        # -------------------------------------------------
-
-        if old_status in [
-            Registration.Status.PUBLISHED,
-            Registration.Status.APPROVED,
-        ]:
-            values = dict(serializer.validated_data)
-            files = {
-                key: values.pop(key)
-                for key in ("profile_photo", "identity_document", "additional_document")
-                if key in values
-            }
-            pending_data = {
-                key: value.isoformat() if hasattr(value, "isoformat") else value
-                for key, value in values.items()
-                if isinstance(value, (str, int, float, bool)) or value is None or hasattr(value, "isoformat")
-            }
-            change, _ = ProfileChange.objects.get_or_create(
-                registration=registration,
-                status=ProfileChange.Status.PENDING_REVIEW,
-                defaults={"user": self.request.user, "previous_status": old_status},
+        registration = serializer.instance
+        values = dict(serializer.validated_data)
+        email = values.pop("email", None)
+        files = {
+            key: values.pop(key)
+            for key in (
+                "profile_photo",
+                "identity_document",
+                "additional_document",
             )
-            change.user = self.request.user
-            changed = []
-            for key, value in pending_data.items():
-                old_value = change.pending_data.get(
-                    key, getattr(registration, key, None)
-                )
-                old_value = old_value.isoformat() if hasattr(old_value, "isoformat") else old_value
-                if old_value != value:
-                    changed.append({"field_name": key, "old_value": old_value, "new_value": value})
-            change.pending_data = {**change.pending_data, **pending_data}
-            replaced_pending_files = []
-            uploaded_files = []
-            try:
-                for field, value in files.items():
-                    pending_field = f"pending_{field}"
-                    previous_file = getattr(change, pending_field)
-                    if previous_file:
-                        replaced_pending_files.append(previous_file)
-                    file_field = getattr(change, pending_field)
-                    file_field.save(value.name, value, save=False)
-                    uploaded_files.append((file_field.storage, file_field.name))
-                    if not file_field.storage.exists(file_field.name):
-                        raise OSError(
-                            f"Uploaded {field.replace('_', ' ')} was not found in media storage after saving."
-                        )
-                    changed.append({"field_name": field, "new_value": value.name})
-                changed_by_field = {item["field_name"]: item for item in change.changed_fields}
-                for item in changed:
-                    old = changed_by_field.get(item["field_name"], {})
-                    changed_by_field[item["field_name"]] = {**old, **item}
-                change.changed_fields = list(changed_by_field.values())
-                with transaction.atomic():
-                    change.save()
-            except Exception:
-                for storage, name in uploaded_files:
-                    try:
-                        storage.delete(name)
-                    except Exception:
-                        logger.exception(
-                            "Failed to remove unreferenced profile upload %s after update failure.",
-                            name,
-                        )
-                raise
-            for previous_file in replaced_pending_files:
-                transaction.on_commit(lambda file=previous_file: file.delete(save=False))
+            if key in values
+        }
+        values = {
+            key: value
+            for key, value in values.items()
+            if key in {field.name for field in Registration._meta.concrete_fields}
+            and key not in {"user", "id"}
+        }
+        if email is not None:
+            values["email"] = email
 
-            verification, _ = ProfileVerification.objects.get_or_create(client=self.request.user)
-            verification.status = ProfileVerification.Status.UNDER_REVIEW
-            verification.correction_message = ""
-            verification.rejection_reason = ""
-            verification.save(update_fields=["status", "correction_message", "rejection_reason", "updated_at"])
-            if changed:
-                details = list(changed)
-                transaction.on_commit(
-                    lambda registration=registration, details=details: (
-                        notify_profile_update(registration, details)
+        uploaded_files = []
+        replaced_pending_files = []
+        try:
+            with transaction.atomic():
+                registration = Registration.objects.select_for_update().get(
+                    pk=registration.pk
+                )
+                change = (
+                    ProfileChange.objects.select_for_update()
+                    .filter(
+                        registration=registration,
+                        status__in=(
+                            ProfileChange.Status.PENDING_REVIEW,
+                            ProfileChange.Status.CORRECTION_REQUIRED,
+                        ),
                     )
+                    .order_by("-created_at")
+                    .first()
                 )
-
-        # -------------------------------------------------
-        # CORRECTION REQUIRED
-        # -------------------------------------------------
-
-        elif old_status == (
-            Registration.Status.CORRECTION_REQUIRED
-        ):
-
-            serializer.save(
-                status=Registration.Status.UNDER_REVIEW,
-                correction_reason=""
-            )
-
-        else:
-            serializer.save()
-
-        if (
-            old_status not in [Registration.Status.PUBLISHED, Registration.Status.APPROVED]
-            and changed_fields
-        ):
-            details = list(changed_fields)
-            transaction.on_commit(
-                lambda registration=registration, details=details: (
-                    notify_profile_update(registration, details)
+                previous_status = (
+                    change.previous_status if change else registration.status
                 )
-            )
+                pending_data = dict(change.pending_data) if change else {}
 
-        if old_status not in [Registration.Status.PUBLISHED, Registration.Status.APPROVED]:
-            verification, _ = ProfileVerification.objects.get_or_create(client=self.request.user)
-            verification.status = (
-                ProfileVerification.Status.UNDER_REVIEW
-                if old_status == Registration.Status.CORRECTION_REQUIRED
-                else ProfileVerification.Status.PENDING
-            )
-            verification.save(update_fields=["status", "updated_at"])
+                for field, value in values.items():
+                    base_value = (
+                        registration.user.email
+                        if field == "email"
+                        else getattr(registration, field)
+                    )
+                    serialized_value = (
+                        value.isoformat() if hasattr(value, "isoformat") else value
+                    )
+                    serialized_base = (
+                        base_value.isoformat()
+                        if hasattr(base_value, "isoformat")
+                        else base_value
+                    )
+                    if serialized_value == serialized_base:
+                        pending_data.pop(field, None)
+                    else:
+                        pending_data[field] = serialized_value
+
+                if change is None and (pending_data or files):
+                    change = ProfileChange(
+                        registration=registration,
+                        user=self.request.user,
+                        previous_status=registration.status,
+                    )
+                elif change:
+                    change.user = self.request.user
+
+                if change:
+                    for field, value in files.items():
+                        pending_field = f"pending_{field}"
+                        previous_file = getattr(change, pending_field)
+                        if previous_file:
+                            replaced_pending_files.append(
+                                (previous_file.storage, previous_file.name)
+                            )
+                        file_field = getattr(change, pending_field)
+                        file_field.save(value.name, value, save=False)
+                        uploaded_files.append((file_field.storage, file_field.name))
+                        if not file_field.storage.exists(file_field.name):
+                            raise OSError(
+                                f"Uploaded {field.replace('_', ' ')} was not found in media storage after saving."
+                            )
+
+                    change.pending_data = pending_data
+                    change_fields = _profile_change_deltas(registration, change)
+                    if change_fields:
+                        _submit_profile_change(
+                            registration,
+                            self.request.user,
+                            change,
+                        )
+                    else:
+                        _cancel_empty_profile_change(
+                            change,
+                            self.request.user,
+                        )
+
+                    for storage, file_name in replaced_pending_files:
+                        transaction.on_commit(
+                            lambda storage=storage, name=file_name: storage.delete(name)
+                        )
+        except Exception:
+            for storage, name in uploaded_files:
+                try:
+                    storage.delete(name)
+                except Exception:
+                    logger.exception(
+                        "Failed to remove unreferenced profile upload %s after update failure.",
+                        name,
+                    )
+            raise
 
 class MyHoroscopeFileView(APIView):
 
@@ -1260,30 +1375,33 @@ class MyHoroscopeFileView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        previous_file_name = registration.horoscope_file.name
-        previous_file_storage = registration.horoscope_file.storage
-        registration.horoscope_file.save(
-            horoscope_file.name,
-            horoscope_file,
-            save=False,
+        change = _active_profile_change(registration, request.user)
+        previous_pending_file = change.pending_horoscope_file
+        previous_pending_path = (
+            (previous_pending_file.storage, previous_pending_file.name)
+            if previous_pending_file
+            else None
         )
-        registration.save(update_fields=["horoscope_file", "updated_at"])
-        if previous_file_name and previous_file_name != registration.horoscope_file.name:
-            previous_file_storage.delete(previous_file_name)
-
-        details = [{"field_name": "horoscope_file"}]
-        transaction.on_commit(
-            lambda registration=registration, details=details: (
-                notify_profile_update(registration, details)
+        pending_file = change.pending_horoscope_file
+        pending_file.save(horoscope_file.name, horoscope_file, save=False)
+        change.pending_horoscope_file = pending_file
+        change.pending_horoscope_delete = False
+        _submit_profile_change(registration, request.user, change)
+        if previous_pending_path:
+            storage, file_name = previous_pending_path
+            transaction.on_commit(
+                lambda storage=storage, name=file_name: storage.delete(name)
             )
-        )
+        details = list(change.changed_fields)
 
         return Response(
             {
-                "message": "Horoscope file uploaded successfully.",
+                "message": "Horoscope file uploaded and sent for admin review.",
                 "horoscope_file_url": request.build_absolute_uri(
-                    "/api/registrations/my-profile/horoscope/"
+                    f"/api/registrations/pending-files/horoscope-file/{change.pk}/"
                 ),
+                "status": "UNDER_REVIEW",
+                "changed_fields": change.changed_fields,
             },
             status=status.HTTP_200_OK,
         )
@@ -1295,24 +1413,35 @@ class MyHoroscopeFileView(APIView):
                 {"detail": "Registration profile not found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        if not registration.horoscope_file:
+        change = _active_profile_change(registration, request.user)
+        if not registration.horoscope_file and not change.pending_horoscope_file:
             return Response(
                 {"detail": "No horoscope file has been uploaded."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        file_name = registration.horoscope_file.name
-        file_storage = registration.horoscope_file.storage
-        registration.horoscope_file = None
-        registration.save(update_fields=["horoscope_file", "updated_at"])
-        file_storage.delete(file_name)
-        details = [{"field_name": "horoscope_file_removed"}]
-        transaction.on_commit(
-            lambda registration=registration, details=details: (
-                notify_profile_update(registration, details)
-            )
+        previous_pending_file = change.pending_horoscope_file
+        previous_pending_path = (
+            (previous_pending_file.storage, previous_pending_file.name)
+            if previous_pending_file
+            else None
         )
-        return Response({"message": "Horoscope file removed successfully."})
+        change.pending_horoscope_file = None
+        change.pending_horoscope_delete = bool(registration.horoscope_file)
+        if not _submit_profile_change(registration, request.user, change):
+            _cancel_empty_profile_change(change, request.user)
+        if previous_pending_path:
+            storage, file_name = previous_pending_path
+            transaction.on_commit(
+                lambda storage=storage, name=file_name: storage.delete(name)
+            )
+
+        details = list(change.changed_fields)
+        return Response({
+            "message": "Horoscope file removal sent for admin review.",
+            "status": "UNDER_REVIEW" if change.changed_fields else registration.status,
+            "changed_fields": change.changed_fields,
+        })
 
 
 # =========================================================
@@ -1869,122 +1998,54 @@ class ClientPhotoUploadView(APIView):
             )
         )
 
-        # -------------------------------------------------
-        # PUBLISHED PROFILE
-        # -------------------------------------------------
-        # New/replaced photo goes to pending_photo.
-        # Existing approved photo remains visible.
-        # -------------------------------------------------
-
-        if registration.status in (
-            Registration.Status.PUBLISHED,
-            Registration.Status.APPROVED,
+        if (
+            slot_index == 1
+            and registration.profile_photo
+            and not client_photo.photo
         ):
+            client_photo.photo = registration.profile_photo
+            client_photo.is_main = True
 
-            old_pending_photo = client_photo.pending_photo
-            client_photo.pending_photo = photo_file
-
-            client_photo.status = (
-                ClientPhoto.Status.PENDING
-            )
-
-            client_photo.save()
-            if old_pending_photo:
-                old_pending_photo.delete(save=False)
-
-            change, _ = ProfileChange.objects.get_or_create(
-                registration=registration,
-                status=ProfileChange.Status.PENDING_REVIEW,
-                defaults={"user": request.user, "previous_status": registration.status},
-            )
-            change.user = request.user
-            if not any(item.get("field_name") == "gallery_photo" and item.get("slot_index") == slot_index for item in change.changed_fields):
-                change.changed_fields.append({"field_name": "gallery_photo", "slot_index": slot_index})
-            change.save()
-            verification, _ = ProfileVerification.objects.get_or_create(client=request.user)
-            verification.status = ProfileVerification.Status.UNDER_REVIEW
-            verification.save(update_fields=["status", "updated_at"])
-            details = list(change.changed_fields)
+        old_pending_photo = client_photo.pending_photo
+        client_photo.pending_photo = photo_file
+        client_photo.pending_delete = False
+        client_photo.status = ClientPhoto.Status.PENDING
+        client_photo.save()
+        if old_pending_photo:
             transaction.on_commit(
-                lambda registration=registration, details=details: (
-                    notify_profile_update(registration, details)
-                )
+                lambda file=old_pending_photo: file.delete(save=False)
             )
 
-            message = (
-                "New photo uploaded and sent for "
-                "admin verification. Existing photo "
-                "remains visible until approved."
+        change = _active_profile_change(registration, request.user)
+        change.changed_fields = _profile_change_deltas(registration, change)
+        change.status = ProfileChange.Status.PENDING_REVIEW
+        change.correction_message = ""
+        change.rejection_reason = ""
+        change.save()
+
+        verification, _ = ProfileVerification.objects.get_or_create(
+            client=request.user
+        )
+        verification.status = ProfileVerification.Status.UNDER_REVIEW
+        verification.correction_message = ""
+        verification.rejection_reason = ""
+        verification.save(update_fields=[
+            "status",
+            "correction_message",
+            "rejection_reason",
+            "updated_at",
+        ])
+        details = list(change.changed_fields)
+        transaction.on_commit(
+            lambda registration=registration, details=details: (
+                notify_profile_update(registration, details)
             )
+        )
 
-        # -------------------------------------------------
-        # NOT PUBLISHED
-        # -------------------------------------------------
-
-        else:
-
-            # Delete old actual file if replacing
-            if client_photo.photo:
-
-                client_photo.photo.delete(
-                    save=False
-                )
-
-            client_photo.photo = photo_file
-
-            client_photo.pending_photo = None
-
-            client_photo.status = (
-                ClientPhoto.Status.APPROVED
-            )
-
-            client_photo.save()
-
-            # -------------------------------------------------
-            # SLOT 1 = MAIN PHOTO
-            # -------------------------------------------------
-
-            if (
-                slot_index == 1
-                or client_photo.is_main
-            ):
-
-                ClientPhoto.objects.filter(
-                    registration=registration
-                ).update(
-                    is_main=False
-                )
-
-                client_photo.is_main = True
-
-                client_photo.save(
-                    update_fields=[
-                        "is_main",
-                        "updated_at",
-                    ]
-                )
-
-                registration.profile_photo = (
-                    client_photo.photo
-                )
-
-                registration.save(
-                    update_fields=[
-                        "profile_photo",
-                        "updated_at",
-                    ]
-                )
-
-            details = [{"field_name": "gallery_photo", "slot_index": slot_index}]
-            transaction.on_commit(
-                lambda registration=registration, details=details: (
-                    notify_profile_update(registration, details)
-                )
-            )
-
-            message = (
-                "Photo uploaded successfully."
-            )
+        message = (
+            "Photo uploaded and sent for admin review. "
+            "Existing photos remain visible until approval."
+        )
 
         serializer = ClientPhotoSerializer(
             client_photo,
@@ -2083,56 +2144,42 @@ class ClientPhotoActionView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # -------------------------------------------------
-            # REMOVE MAIN FROM ALL PHOTOS
-            # -------------------------------------------------
-
-            ClientPhoto.objects.filter(
-                registration=registration
-            ).update(
-                is_main=False
-            )
-
-            # -------------------------------------------------
-            # MAKE SELECTED PHOTO MAIN
-            # -------------------------------------------------
-
-            client_photo.is_main = True
-
-            client_photo.save(
-                update_fields=[
-                    "is_main",
-                    "updated_at",
-                ]
-            )
-
-            # -------------------------------------------------
-            # UPDATE REGISTRATION MAIN PHOTO
-            # -------------------------------------------------
-
-            registration.profile_photo = (
-                client_photo.photo
-            )
-
-            registration.save(
-                update_fields=[
-                    "profile_photo",
-                    "updated_at",
-                ]
-            )
-
-            details = [{"field_name": "profile_photo"}]
-            transaction.on_commit(
-                lambda registration=registration, details=details: (
-                    notify_profile_update(registration, details)
+            if (
+                registration.profile_photo
+                and registration.profile_photo.name == client_photo.photo.name
+            ):
+                return Response(
+                    {"message": "This is already your main photo."},
+                    status=status.HTTP_200_OK,
                 )
+
+            change = _active_profile_change(registration, request.user)
+            previous_pending = change.pending_profile_photo
+            previous_pending_path = (
+                (previous_pending.storage, previous_pending.name)
+                if previous_pending
+                else None
             )
+            client_photo.photo.open("rb")
+            try:
+                change.pending_profile_photo.save(
+                    client_photo.photo.name.rsplit("/", 1)[-1],
+                    client_photo.photo.file,
+                    save=False,
+                )
+            finally:
+                client_photo.photo.close()
+            _submit_profile_change(registration, request.user, change)
+            if previous_pending_path:
+                storage, file_name = previous_pending_path
+                transaction.on_commit(
+                    lambda storage=storage, name=file_name: storage.delete(name)
+                )
 
             return Response(
                 {
-                    "message": (
-                        "Main photo updated successfully."
-                    )
+                    "message": "Main photo change sent for admin review.",
+                    "status": "UNDER_REVIEW",
                 },
                 status=status.HTTP_200_OK
             )
@@ -2163,74 +2210,70 @@ class ClientPhotoActionView(APIView):
             registration=registration,
             slot_index=slot_index,
         ).first()
+        if (
+            client_photo is None
+            and slot_index == 1
+            and registration.profile_photo
+        ):
+            client_photo = ClientPhoto.objects.create(
+                registration=registration,
+                slot_index=1,
+                is_main=True,
+                photo=registration.profile_photo,
+                status=ClientPhoto.Status.APPROVED,
+            )
         if not client_photo:
-            if slot_index == 1 and registration.profile_photo:
-                registration.profile_photo.delete(save=False)
-                next_photo = (
-                    ClientPhoto.objects.filter(
-                        registration=registration,
-                        status=ClientPhoto.Status.APPROVED,
-                    )
-                    .exclude(photo="")
-                    .order_by("slot_index")
-                    .first()
-                )
-                ClientPhoto.objects.filter(registration=registration).update(is_main=False)
-                if next_photo:
-                    next_photo.is_main = True
-                    next_photo.save(update_fields=["is_main", "updated_at"])
-                    registration.profile_photo = next_photo.photo
-                else:
-                    registration.profile_photo = None
-                registration.save(update_fields=["profile_photo", "updated_at"])
-                return Response(
-                    {"message": "Photo deleted successfully.", "slot_index": slot_index},
-                    status=status.HTTP_200_OK,
-                )
             return Response(
                 {"detail": "Photo not found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        removed_main_photo = bool(
-            client_photo.photo and (client_photo.is_main or slot_index == 1)
-        )
+        change = _active_profile_change(registration, request.user)
         if client_photo.photo:
-            client_photo.photo.delete(save=False)
-        if client_photo.pending_photo:
-            client_photo.pending_photo.delete(save=False)
-        client_photo.delete()
-
-        if removed_main_photo:
-            next_photo = (
-                ClientPhoto.objects.filter(
-                    registration=registration,
-                    status=ClientPhoto.Status.APPROVED,
+            discarded_pending = client_photo.pending_photo
+            discarded_pending_path = (
+                (discarded_pending.storage, discarded_pending.name)
+                if discarded_pending
+                else None
+            )
+            client_photo.pending_photo = None
+            client_photo.pending_delete = True
+            client_photo.status = ClientPhoto.Status.PENDING
+            client_photo.save(update_fields=[
+                "pending_photo",
+                "pending_delete",
+                "status",
+                "updated_at",
+            ])
+            if discarded_pending_path:
+                storage, file_name = discarded_pending_path
+                transaction.on_commit(
+                    lambda storage=storage, name=file_name: storage.delete(name)
                 )
-                .exclude(photo="")
-                .order_by("slot_index")
-                .first()
+            message = "Photo removal sent for admin review."
+        else:
+            pending_file = client_photo.pending_photo
+            pending_file_path = (
+                (pending_file.storage, pending_file.name)
+                if pending_file
+                else None
             )
-            ClientPhoto.objects.filter(registration=registration).update(is_main=False)
-            if next_photo:
-                next_photo.is_main = True
-                next_photo.save(update_fields=["is_main", "updated_at"])
-                registration.profile_photo = next_photo.photo
-            else:
-                registration.profile_photo = None
-            registration.save(update_fields=["profile_photo", "updated_at"])
+            client_photo.delete()
+            if pending_file_path:
+                storage, file_name = pending_file_path
+                transaction.on_commit(
+                    lambda storage=storage, name=file_name: storage.delete(name)
+                )
+            message = "Unapproved photo upload withdrawn."
 
-        details = [{"field_name": "gallery_photo_removed", "slot_index": slot_index}]
-        transaction.on_commit(
-            lambda registration=registration, details=details: (
-                notify_profile_update(registration, details)
-            )
-        )
+        if not _submit_profile_change(registration, request.user, change):
+            _cancel_empty_profile_change(change, request.user)
 
         return Response(
             {
-                "message": "Photo deleted successfully.",
+                "message": message,
                 "slot_index": slot_index,
+                "status": "UNDER_REVIEW" if change.changed_fields else registration.status,
             },
             status=status.HTTP_200_OK,
         )
@@ -2283,6 +2326,7 @@ class PendingFileView(APIView):
                 "profile-photo": "pending_profile_photo",
                 "identity-document": "pending_identity_document",
                 "additional-document": "pending_additional_document",
+                "horoscope-file": "pending_horoscope_file",
             }.get(kind)
             file_field = getattr(change, field_name) if change and field_name else None
             filename = file_field.name if file_field else ""

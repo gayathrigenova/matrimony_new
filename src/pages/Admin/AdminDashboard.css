@@ -211,6 +211,19 @@
   color: #d32f2f;
 }
 
+.profile-updated-indicator {
+  display: inline-block;
+  margin-left: 7px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  background: #fff4e5;
+  color: #a45100;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
 
 /* ================= VIEW BUTTON ================= */
 

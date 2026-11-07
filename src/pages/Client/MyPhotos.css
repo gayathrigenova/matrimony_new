@@ -101,6 +101,43 @@
   object-fit: cover;
 }
 
+.photo-change-preview {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  height: 100%;
+  gap: 2px;
+}
+
+.photo-preview-side {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.photo-preview-side img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-preview-side > span {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: rgba(31, 41, 55, 0.8);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.photo-preview-side.proposed > span {
+  background: rgba(8, 116, 66, 0.9);
+}
+
 .empty-slot-placeholder {
   text-align: center;
   color: var(--muted);

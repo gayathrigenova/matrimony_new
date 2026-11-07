@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import ClientLayout from "../../components/ClientLayout";
 import ProtectedImage from "../../components/ProtectedImage";
+import ProtectedFileLink from "../../components/ProtectedFileLink";
 import "./MyProfile.css";
 
 
@@ -88,6 +89,62 @@ export default function MyProfile() {
     }
   };
 
+  const fieldLabels = {
+    full_name: "Full Name",
+    gender: "Gender",
+    date_of_birth: "Date of Birth",
+    religion: "Religion",
+    caste: "Caste",
+    birth_star: "Birth Star",
+    marital_status: "Marital Status",
+    height: "Height",
+    disability: "Disability",
+    address: "Address",
+    city: "City",
+    district: "District",
+    state: "State",
+    education_level: "Education Level",
+    education: "Education",
+    highest_education: "Highest Education",
+    occupation_level: "Occupation Level",
+    occupation: "Occupation",
+    company: "Company",
+    income: "Annual Income",
+    work_location: "Work Location",
+    working_place: "Working Place",
+    phone: "Phone Number",
+    alternate_phone: "Alternate Phone",
+    email: "Email Address",
+    about: "About",
+    father_name: "Father's Name",
+    father_occupation: "Father's Occupation",
+    mother_name: "Mother's Name",
+    mother_occupation: "Mother's Occupation",
+    brothers: "Brothers",
+    married_brothers: "Married Brothers",
+    sisters: "Sisters",
+    married_sisters: "Married Sisters",
+    financial_level: "Financial Level",
+    about_family: "About Family",
+    place: "Native Place",
+    house_name: "House Name",
+    bus_stop: "Bus Stop",
+    post_office: "Post Office",
+    taluk: "Taluk",
+    village: "Village",
+    contact_name: "Contact Person",
+    relationship: "Relationship",
+    country_code: "Country Code",
+    contact_phone: "Contact Phone",
+    extra_phone: "Additional Phone",
+    profile_photo: "Profile Photo",
+    identity_document: "Identity Document",
+    additional_document: "Additional Document",
+    horoscope_file: "Horoscope",
+    gallery_photo: "Gallery Photo",
+  };
+  const changedFields = profile.changed_fields || [];
+
   return (
     <ClientLayout>
       <div className="my-profile-container">
@@ -134,6 +191,44 @@ export default function MyProfile() {
               {profile.correction_reason || "The admin team requested corrections to your profile information before approval."}
             </div>
           </div>
+        )}
+
+        {changedFields.length > 0 && (
+          <section className={`profile-change-summary ${profile.status === "REJECTED" ? "rejected" : ""}`}>
+            <h2>
+              {profile.status === "REJECTED"
+                ? "Last profile changes were rejected"
+                : profile.status === "CORRECTION_REQUIRED"
+                  ? "Changes requiring correction"
+                  : "Profile changes awaiting admin approval"}
+            </h2>
+            <p>
+              {profile.status === "UNDER_REVIEW"
+                ? "Your approved profile remains unchanged until the admin approves these updates."
+                : profile.status === "REJECTED"
+                  ? `The previous approved information is still active. ${profile.rejection_reason || ""}`
+                  : "Review the previous and proposed values below."}
+            </p>
+            <div className="profile-change-list">
+              {changedFields.map((change, index) => (
+                <div
+                  className="profile-change-item"
+                  key={`${change.field_name}-${change.slot_index ?? index}`}
+                >
+                  <strong className="profile-change-label">
+                    {change.field_name === "gallery_photo"
+                      ? `${fieldLabels.gallery_photo} ${change.slot_index}`
+                      : fieldLabels[change.field_name] || change.field_name}
+                  </strong>
+                  <div className="profile-change-values">
+                    <ChangeValue change={change} side="old" />
+                    <span className="profile-change-arrow" aria-hidden="true">→</span>
+                    <ChangeValue change={change} side="new" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
         )}
 
         {/* PERSONAL DETAILS */}
@@ -218,10 +313,38 @@ export default function MyProfile() {
             <DetailItem label="Contact Person Name" value={profile.contact_name} />
             <DetailItem label="Relationship" value={profile.relationship} />
             <DetailItem label="Contact Person Phone" value={profile.contact_phone ? `${profile.country_code || '+91'} ${profile.contact_phone}` : null} />
+            <DetailItem label="Email Address" value={profile.email} />
           </div>
         </div>
       </div>
     </ClientLayout>
+  );
+}
+
+function ChangeValue({ change, side }) {
+  const value = change[`${side}_value`];
+  const url = change[`${side}_value_url`];
+  const fieldName = change.field_name;
+  const isImage = fieldName === "profile_photo" || fieldName === "gallery_photo";
+  const isDocument = [
+    "identity_document",
+    "additional_document",
+    "horoscope_file",
+  ].includes(fieldName);
+
+  return (
+    <div className={`profile-change-value ${side}`}>
+      <span>{side === "old" ? "Previous" : "Proposed"}</span>
+      {url && isImage ? (
+        <ProtectedImage src={url} alt={`${side} ${fieldName.replaceAll("_", " ")}`} />
+      ) : url && isDocument ? (
+        <ProtectedFileLink href={url}>{value || "View file"}</ProtectedFileLink>
+      ) : side === "old" ? (
+        <del>{value === null || value === "" ? "Not provided" : String(value)}</del>
+      ) : (
+        <strong>{value === null || value === "" ? "Removed" : String(value)}</strong>
+      )}
+    </div>
   );
 }
 

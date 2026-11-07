@@ -1,5 +1,6 @@
 from django.utils import timezone
 from django.db import transaction
+from django.db.models import Q
 from pathlib import Path
 
 from rest_framework import status
@@ -29,18 +30,44 @@ logger = logging.getLogger(__name__)
 def pending_change(registration):
     return ProfileChange.objects.filter(
         registration=registration,
-        status=ProfileChange.Status.PENDING_REVIEW,
+        status__in=(
+            ProfileChange.Status.PENDING_REVIEW,
+            ProfileChange.Status.CORRECTION_REQUIRED,
+        ),
     ).first()
 
 
 def pending_gallery_photos(registration):
-    return registration.photos.exclude(
-        pending_photo=""
-    ).exclude(pending_photo__isnull=True)
+    return registration.photos.filter(
+        Q(pending_delete=True)
+        | (Q(pending_photo__isnull=False) & ~Q(pending_photo=""))
+    )
+
+
+def clear_pending_gallery(registration):
+    for photo in pending_gallery_photos(registration):
+        pending_file = photo.pending_photo
+        if pending_file:
+            transaction.on_commit(
+                lambda file=pending_file: file.delete(save=False)
+            )
+        if photo.photo:
+            photo.pending_photo = None
+            photo.pending_delete = False
+            photo.status = ClientPhoto.Status.APPROVED
+            photo.save(update_fields=[
+                "pending_photo",
+                "pending_delete",
+                "status",
+                "updated_at",
+            ])
+        else:
+            photo.delete()
 
 
 def registration_payload(registration, request, change=None):
     data = RegistrationCheckingSerializer(registration, context={"request": request}).data
+    data["email"] = registration.user.email
     for field in ("identity_document", "additional_document"):
         if getattr(registration, field):
             kind = "client-" + field.replace("_", "-")
@@ -54,9 +81,65 @@ def registration_payload(registration, request, change=None):
             if pending_file:
                 kind = field.replace("_", "-")
                 data[field] = request.build_absolute_uri(f"/api/registrations/pending-files/{kind}/{change.pk}/")
+        if change.pending_horoscope_file:
+            data["horoscope_file"] = request.build_absolute_uri(
+                f"/api/registrations/pending-files/horoscope-file/{change.pk}/"
+            )
         data["status"] = "UNDER_REVIEW"
         data["pending_change_id"] = change.pk
     return data
+
+
+def profile_change_payload(change, registration, request):
+    changed_fields = []
+    for item in change.changed_fields:
+        delta = dict(item)
+        field_name = delta.get("field_name")
+        old_url = None
+        new_url = None
+
+        if field_name == "profile_photo":
+            if registration.profile_photo and registration.profile_photo.storage.exists(registration.profile_photo.name):
+                old_url = request.build_absolute_uri(registration.profile_photo.url)
+            if change.pending_profile_photo:
+                new_url = request.build_absolute_uri(
+                    f"/api/registrations/pending-files/profile-photo/{change.pk}/"
+                )
+        elif field_name in ("identity_document", "additional_document"):
+            old_file = getattr(registration, field_name)
+            if old_file:
+                old_url = request.build_absolute_uri(
+                    f"/api/registrations/pending-files/client-{field_name.replace('_', '-')}/{registration.pk}/"
+                )
+            if getattr(change, f"pending_{field_name}"):
+                new_url = request.build_absolute_uri(
+                    f"/api/registrations/pending-files/{field_name.replace('_', '-')}/{change.pk}/"
+                )
+        elif field_name == "horoscope_file":
+            if registration.horoscope_file:
+                old_url = request.build_absolute_uri(
+                    "/api/registrations/my-profile/horoscope/"
+                )
+            if change.pending_horoscope_file:
+                new_url = request.build_absolute_uri(
+                    f"/api/registrations/pending-files/horoscope-file/{change.pk}/"
+                )
+        elif field_name == "gallery_photo":
+            photo = registration.photos.filter(
+                slot_index=delta.get("slot_index")
+            ).first()
+            if photo and photo.photo and photo.photo.storage.exists(photo.photo.name):
+                old_url = request.build_absolute_uri(photo.photo.url)
+            if photo and photo.pending_photo:
+                new_url = request.build_absolute_uri(
+                    f"/api/registrations/pending-files/gallery-photo/{photo.pk}/"
+                )
+
+        if old_url or new_url:
+            delta["old_value_url"] = old_url
+            delta["new_value_url"] = new_url
+        changed_fields.append(delta)
+    return changed_fields
 
 
 class AdminRegistrationListView(APIView):
@@ -69,7 +152,12 @@ class AdminRegistrationListView(APIView):
 
         for registration in registrations:
             change = pending_change(registration)
-            latest_change = registration.profile_changes.exclude(status=ProfileChange.Status.APPROVED).first()
+            latest_change = registration.profile_changes.exclude(
+                status__in=(
+                    ProfileChange.Status.APPROVED,
+                    ProfileChange.Status.CANCELLED,
+                )
+            ).first()
             verification, created = ProfileVerification.objects.get_or_create(
                 client=registration.user,
                 defaults={
@@ -142,8 +230,10 @@ class AdminRegistrationDetailView(APIView):
             "registration": registration_payload(registration, request, change),
             "pending_change": ({
                 "id": change.pk,
-                "changed_fields": change.changed_fields,
+                "changed_fields": profile_change_payload(change, registration, request),
                 "pending_data": change.pending_data,
+                "status": change.status,
+                "rejection_reason": change.rejection_reason,
                 "created_at": change.created_at,
             } if change else None),
             "pending_photos": pending_photos,
@@ -265,9 +355,25 @@ class AdminApproveRegistrationView(APIView):
                 },
                 status=status.HTTP_409_CONFLICT,
             )
+        pending_email = change.pending_data.get("email") if change else None
+        if pending_email and registration.user.__class__.objects.filter(
+            email__iexact=pending_email
+        ).exclude(pk=registration.user_id).exists():
+            return Response(
+                {
+                    "detail": "The requested email address is now in use. Ask the client to choose another address.",
+                    "code": "email_unavailable",
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
         if change:
             missing_uploads = []
-            for field in ("pending_profile_photo", "pending_identity_document", "pending_additional_document"):
+            for field in (
+                "pending_profile_photo",
+                "pending_identity_document",
+                "pending_additional_document",
+                "pending_horoscope_file",
+            ):
                 pending_file = getattr(change, field)
                 if pending_file and not pending_file.storage.exists(pending_file.name):
                     missing_uploads.append(field.removeprefix("pending_").replace("_", " "))
@@ -296,13 +402,34 @@ class AdminApproveRegistrationView(APIView):
             if change:
                 pending_to_delete = []
                 has_pending_profile_photo = bool(change.pending_profile_photo)
-                has_pending_main_gallery_photo = pending_gallery_photos(registration).filter(slot_index=1).exists()
+                has_pending_main_gallery_photo = pending_gallery_photos(
+                    registration
+                ).filter(slot_index=1, pending_delete=False).exists()
                 for field, value in change.pending_data.items():
+                    if field == "email":
+                        registration.user.email = value
+                        registration.user.save(update_fields=["email", "updated_at"])
+                        continue
                     if hasattr(registration, field):
                         if field == "date_of_birth" and isinstance(value, str):
                             value = date.fromisoformat(value)
                         setattr(registration, field, value)
-                for field in ("profile_photo", "identity_document", "additional_document"):
+                if change.pending_horoscope_delete:
+                    old_horoscope = registration.horoscope_file
+                    if old_horoscope:
+                        transaction.on_commit(
+                            lambda storage=old_horoscope.storage, name=old_horoscope.name: (
+                                storage.delete(name)
+                            )
+                        )
+                    registration.horoscope_file = None
+                    change.pending_horoscope_delete = False
+                for field in (
+                    "profile_photo",
+                    "identity_document",
+                    "additional_document",
+                    "horoscope_file",
+                ):
                     pending_file = getattr(change, f"pending_{field}")
                     if pending_file:
                         pending_file.open("rb")
@@ -320,6 +447,34 @@ class AdminApproveRegistrationView(APIView):
                     Registration.Status.PUBLISHED if was_published_update else Registration.Status.APPROVED
                 )
                 for photo in pending_gallery_photos(registration):
+                    if photo.pending_delete:
+                        was_main_photo = photo.is_main or photo.slot_index == 1
+                        if photo.photo:
+                            old_storage = photo.photo.storage
+                            old_name = photo.photo.name
+                            transaction.on_commit(
+                                lambda storage=old_storage, name=old_name: storage.delete(name)
+                            )
+                        photo.delete()
+                        if was_main_photo:
+                            next_photo = (
+                                registration.photos.filter(
+                                    status=ClientPhoto.Status.APPROVED
+                                )
+                                .exclude(photo="")
+                                .order_by("slot_index")
+                                .first()
+                            )
+                            ClientPhoto.objects.filter(
+                                registration=registration
+                            ).update(is_main=False)
+                            if next_photo:
+                                next_photo.is_main = True
+                                next_photo.save(update_fields=["is_main", "updated_at"])
+                                registration.profile_photo = next_photo.photo
+                            else:
+                                registration.profile_photo = None
+                        continue
                     pending_file = photo.pending_photo
                     pending_file.open("rb")
                     try:
@@ -350,7 +505,17 @@ class AdminApproveRegistrationView(APIView):
                 change.status = ProfileChange.Status.APPROVED
                 change.reviewed_by = request.user
                 change.reviewed_at = timezone.now()
-                change.save(update_fields=["status", "reviewed_by", "reviewed_at", "updated_at", "pending_profile_photo", "pending_identity_document", "pending_additional_document"])
+                change.save(update_fields=[
+                    "status",
+                    "reviewed_by",
+                    "reviewed_at",
+                    "updated_at",
+                    "pending_profile_photo",
+                    "pending_identity_document",
+                    "pending_additional_document",
+                    "pending_horoscope_file",
+                    "pending_horoscope_delete",
+                ])
             else:
                 registration.status = Registration.Status.APPROVED
                 registration.verified_by = request.user
@@ -422,6 +587,7 @@ class AdminCorrectionRegistrationView(APIView):
             change.reviewed_by = request.user
             change.reviewed_at = timezone.now()
             change.save(update_fields=["status", "correction_message", "reviewed_by", "reviewed_at", "updated_at"])
+            clear_pending_gallery(registration)
 
         keep_published = bool(change and change.previous_status == Registration.Status.PUBLISHED)
         if not keep_published:
@@ -480,6 +646,7 @@ class AdminRejectRegistrationView(APIView):
             change.reviewed_by = request.user
             change.reviewed_at = timezone.now()
             change.save(update_fields=["status", "rejection_reason", "reviewed_by", "reviewed_at", "updated_at"])
+            clear_pending_gallery(registration)
 
         keep_published = bool(change and change.previous_status == Registration.Status.PUBLISHED)
         if not keep_published:

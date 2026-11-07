@@ -637,6 +637,8 @@ class ClientPhoto(models.Model):
         null=True
     )
 
+    pending_delete = models.BooleanField(default=False)
+
     slot_index = models.PositiveIntegerField(
         default=1
     )

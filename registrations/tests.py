@@ -79,6 +79,157 @@ class RegistrationBirthStarTests(TestCase):
         self.assertEqual([profile["full_name"] for profile in results], ["Matching Star"])
         self.assertEqual(results[0]["birth_star"], "Ashwathi")
 
+    def test_published_profiles_can_be_filtered_by_education_level(self):
+        matching_user = User.objects.create_user(
+            email="undergraduate-match@example.com",
+            password="test-password",
+        )
+        other_user = User.objects.create_user(
+            email="diploma-match@example.com",
+            password="test-password",
+        )
+        Registration.objects.create(
+            user=matching_user,
+            full_name="Undergraduate Profile",
+            gender="Female",
+            date_of_birth=date(1995, 1, 1),
+            education_level="Undergraduate",
+            education="Computer Science",
+            status=Registration.Status.PUBLISHED,
+        )
+        Registration.objects.create(
+            user=other_user,
+            full_name="Diploma Profile",
+            gender="Female",
+            date_of_birth=date(1995, 1, 1),
+            education_level="Diploma",
+            education="Computer Science",
+            status=Registration.Status.PUBLISHED,
+        )
+
+        response = APIClient().get(
+            "/api/registrations/published/",
+            {"education": "Undergraduate"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        results = (
+            response.data.get("results", response.data)
+            if isinstance(response.data, dict)
+            else response.data
+        )
+        self.assertEqual(
+            [profile["full_name"] for profile in results],
+            ["Undergraduate Profile"],
+        )
+
+    def test_published_profiles_apply_all_partner_search_filters_together(self):
+        today = date.today()
+        matching_dob = date(today.year - 30, today.month, today.day)
+        matching_user = User.objects.create_user(
+            email="combined-match@example.com",
+            password="test-password",
+        )
+        wrong_height_user = User.objects.create_user(
+            email="wrong-height@example.com",
+            password="test-password",
+        )
+        approved_user = User.objects.create_user(
+            email="approved-only@example.com",
+            password="test-password",
+        )
+
+        Registration.objects.create(
+            user=matching_user,
+            full_name="Matching Profile",
+            gender="Female",
+            date_of_birth=matching_dob,
+            religion="Hindu",
+            caste="Thiyya",
+            birth_star="Ashwathi",
+            height="5'5\"",
+            status=Registration.Status.PUBLISHED,
+        )
+        Registration.objects.create(
+            user=wrong_height_user,
+            full_name="Wrong Height",
+            gender="Female",
+            date_of_birth=matching_dob,
+            religion="Hindu",
+            caste="Thiyya",
+            birth_star="Ashwathi",
+            height="6'0\"",
+            status=Registration.Status.PUBLISHED,
+        )
+        mismatch_profiles = [
+            ("wrong-gender@example.com", "Wrong Gender", {"gender": "Male"}),
+            ("wrong-religion@example.com", "Wrong Religion", {"religion": "Christian"}),
+            ("wrong-caste@example.com", "Wrong Caste", {"caste": "Ezhava"}),
+            ("wrong-star@example.com", "Wrong Star", {"birth_star": "Revathi"}),
+            (
+                "too-young@example.com",
+                "Too Young",
+                {"date_of_birth": date(today.year - 20, today.month, today.day)},
+            ),
+            (
+                "too-old@example.com",
+                "Too Old",
+                {"date_of_birth": date(today.year - 40, today.month, today.day)},
+            ),
+        ]
+        for email, name, overrides in mismatch_profiles:
+            user = User.objects.create_user(email=email, password="test-password")
+            profile_fields = {
+                "gender": "Female",
+                "date_of_birth": matching_dob,
+                "religion": "Hindu",
+                "caste": "Thiyya",
+                "birth_star": "Ashwathi",
+                "height": "5'5\"",
+            }
+            profile_fields.update(overrides)
+            Registration.objects.create(
+                user=user,
+                full_name=name,
+                status=Registration.Status.PUBLISHED,
+                **profile_fields,
+            )
+        Registration.objects.create(
+            user=approved_user,
+            full_name="Not Publicly Published",
+            gender="Female",
+            date_of_birth=matching_dob,
+            religion="Hindu",
+            caste="Thiyya",
+            birth_star="Ashwathi",
+            height="5'5\"",
+            status=Registration.Status.APPROVED,
+        )
+
+        response = APIClient().get(
+            "/api/registrations/published/",
+            {
+                "gender": "Female",
+                "religion": "Hindu",
+                "caste": "Thiyya",
+                "birth_star": "Ashwathi",
+                "age_from": "29",
+                "age_to": "31",
+                "height_from_cm": "165",
+                "height_to_cm": "178",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        results = (
+            response.data.get("results", response.data)
+            if isinstance(response.data, dict)
+            else response.data
+        )
+        self.assertEqual([profile["full_name"] for profile in results], ["Matching Profile"])
+        self.assertNotIn("phone", results[0])
+        self.assertNotIn("email", results[0])
+
 
 class RegistrationDuplicateValidationTests(TestCase):
     def setUp(self):

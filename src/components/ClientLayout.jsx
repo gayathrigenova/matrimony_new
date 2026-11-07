@@ -151,17 +151,6 @@ export default function ClientLayout({ children }) {
             <span>Shortlist</span>
           </button>
 
-          <button
-            className={`nav-item ${isActive("/messages") ? "active" : ""}`}
-            onClick={() => {
-              navigate("/messages");
-              setSidebarOpen(false);
-            }}
-          >
-            <span className="nav-icon">▱</span>
-            <span>Messages</span>
-          </button>
-
           <p className="nav-heading second-heading">ACCOUNT</p>
 
           <button

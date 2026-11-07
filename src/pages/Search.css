@@ -69,40 +69,6 @@ background-repeat: no-repeat;
   margin-bottom: 1.5rem;
 }
 
-.search-nest-bar {
-  display: flex;
-  align-items: center;
-  background: #fff;
-  border-radius: 50px;
-  overflow: hidden;
-  max-width: 520px;
-  margin: 0 auto;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-}
-
-.search-nest-bar input {
-  flex: 1;
-  border: none;
-  outline: none;
-  padding: 0.85rem 1.5rem;
-  font-size: 1rem;
-  color: #333;
-  background: transparent;
-}
-
-.nest-search-btn {
-  background: #00ab5b;
-  border: none;
-  color: #fff;
-  padding: 0.85rem 1.2rem;
-  font-size: 1.2rem;
-  cursor: pointer;
-  border-radius: 0 50px 50px 0;
-  transition: background 0.3s;
-}
-
-.nest-search-btn:hover { background: #008244; }
-
 /* ===== FILTER SECTION ===== */
 .search-filter-section {
   background: #f8f9fa;
@@ -315,6 +281,22 @@ background-repeat: no-repeat;
 .profile-info h4 { color: #333; font-size: 1rem; margin: 0; }
 .profile-info span { color: #888; font-size: 0.85rem; }
 
+.profile-info .search-result-id {
+  color: #075c35;
+  font-weight: 700;
+}
+
+.search-result-photo-placeholder {
+  width: 100%;
+  height: 200px;
+  display: grid;
+  place-items: center;
+  color: #087442;
+  background: linear-gradient(135deg, #e5f5ec, #f7fbf8);
+  font-size: 64px;
+  font-weight: 700;
+}
+
 .profile-info button {
   margin-top: 0.6rem;
   padding: 0.5rem;
@@ -341,7 +323,6 @@ background-repeat: no-repeat;
   .search-banner { padding: 6rem 1rem 2rem; min-height: 220px; }
   .search-banner-content h1 { font-size: 1.8rem; }
   .search-banner-content p { font-size: 0.9rem; }
-  .search-nest-bar { max-width: 100%; }
   .filter-row { grid-template-columns: 1fr; gap: 1rem; }
   .search-filter-card { padding: 1.5rem 1rem; }
   .why-cards { grid-template-columns: 1fr; }

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { EDUCATION_LEVEL_OPTIONS } from "../constants.js";
 import "./RegistrationDetails1.css";
 
 const HEIGHT_OPTIONS = Array.from({ length: 37 }, (_, index) => {
@@ -146,13 +147,12 @@ export default function RegistrationDetails1() {
                 onChange={handleChange}
               >
                 <option value="">Select Education Level</option>
-                <option value="School">School</option>
-                <option value="Higher Secondary">Higher Secondary</option>
-                <option value="Diploma">Diploma</option>
-                <option value="Undergraduate">Undergraduate</option>
-                <option value="Postgraduate">Postgraduate</option>
-                <option value="Doctorate">Doctorate</option>
-                <option value="Other">Other</option>
+                {formData.educationLevel && !EDUCATION_LEVEL_OPTIONS.includes(formData.educationLevel) && (
+                  <option value={formData.educationLevel}>{formData.educationLevel}</option>
+                )}
+                {EDUCATION_LEVEL_OPTIONS.map((level) => (
+                  <option key={level} value={level}>{level}</option>
+                ))}
               </select>
             </div>
 

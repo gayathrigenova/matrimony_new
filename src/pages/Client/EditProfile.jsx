@@ -1,5 +1,5 @@
 import { API_URL, fetchWithTokenRefresh as fetchAuthenticatedRequest } from "../../api.js";
-import { BIRTH_STAR_OPTIONS, CASTE_OPTIONS } from "../../constants.js";
+import { BIRTH_STAR_OPTIONS, CASTE_OPTIONS, EDUCATION_LEVEL_OPTIONS } from "../../constants.js";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ClientLayout from "../../components/ClientLayout";
@@ -494,7 +494,15 @@ export default function EditProfile() {
             <div className="form-grid">
               <div className="form-group">
                 <label>Education Level</label>
-                <input type="text" name="education_level" value={formData.education_level} onChange={handleChange} placeholder="e.g. Bachelor's, Master's" />
+                <select name="education_level" value={formData.education_level} onChange={handleChange}>
+                  <option value="">Select Education Level</option>
+                  {formData.education_level && !EDUCATION_LEVEL_OPTIONS.includes(formData.education_level) && (
+                    <option value={formData.education_level}>{formData.education_level}</option>
+                  )}
+                  {EDUCATION_LEVEL_OPTIONS.map((level) => (
+                    <option key={level} value={level}>{level}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="form-group">

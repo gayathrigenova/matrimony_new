@@ -812,6 +812,24 @@ class PublishedRegistrationListView(generics.ListAPIView):
                 date_of_birth__gt=min_dob
             )
 
+        height_from = params.get("height_from_cm")
+        height_to = params.get("height_to_cm")
+        if (
+            (height_from and height_from.isdigit())
+            or (height_to and height_to.isdigit())
+        ):
+            min_height = int(height_from) if height_from and height_from.isdigit() else 0
+            max_height = int(height_to) if height_to and height_to.isdigit() else 1000
+            if min_height > max_height:
+                return queryset.none()
+
+            matching_heights = [
+                f"{total_inches // 12}'{total_inches % 12}\""
+                for total_inches in range(48, 85)
+                if min_height <= round(total_inches * 2.54) <= max_height
+            ]
+            queryset = queryset.filter(height__in=matching_heights)
+
         return queryset
 
 

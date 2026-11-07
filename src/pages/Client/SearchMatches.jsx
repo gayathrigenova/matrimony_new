@@ -1,5 +1,5 @@
 import { API_URL } from "../../api.js";
-import { BIRTH_STAR_OPTIONS, CASTE_OPTIONS } from "../../constants.js";
+import { BIRTH_STAR_OPTIONS, CASTE_OPTIONS, EDUCATION_LEVEL_OPTIONS } from "../../constants.js";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ClientLayout from "../../components/ClientLayout";
@@ -180,14 +180,17 @@ export default function SearchMatches() {
               </div>
 
               <div className="filter-group">
-                <label>Education</label>
-                <input
-                  type="text"
+                <label>Education Level</label>
+                <select
                   name="education"
-                  placeholder="e.g. B.Tech, MBA"
                   value={filters.education}
                   onChange={handleFilterChange}
-                />
+                >
+                  <option value="">All Education Levels</option>
+                  {EDUCATION_LEVEL_OPTIONS.map((level) => (
+                    <option key={level} value={level}>{level}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="filter-group">

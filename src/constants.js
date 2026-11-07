@@ -1,5 +1,18 @@
 export const CASTE_OPTIONS = ["Thiyya", "Ezhava"];
 
+export const EDUCATION_LEVEL_OPTIONS = [
+  "School",
+  "8th Standard",
+  "9th Standard",
+  "10th Standard",
+  "Higher Secondary",
+  "Diploma",
+  "Undergraduate",
+  "Postgraduate",
+  "Doctorate",
+  "Other",
+];
+
 export const BIRTH_STAR_OPTIONS = [
   "Ashwathi",
   "Bharani",

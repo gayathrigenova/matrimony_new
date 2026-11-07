@@ -11,6 +11,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("PENDING");
   const [error, setError] = useState("");
+  const [deletingRegistrationId, setDeletingRegistrationId] = useState(null);
 
   // =====================================================
   // NORMALIZE STATUS
@@ -242,6 +243,49 @@ export default function AdminDashboard() {
     }
 
     navigate(`/admin/view/${registration.id}`);
+  };
+
+  const handleRemove = async (registration) => {
+    const profileName = registration.full_name || registration.name || "this profile";
+    if (!window.confirm(
+      `Permanently delete ${profileName}'s profile and related data? If this user has no other profiles, their account will also be deleted. This cannot be undone.`
+    )) {
+      return;
+    }
+
+    setDeletingRegistrationId(registration.id);
+    try {
+      const response = await fetchWithTokenRefresh(
+        `${API_URL}/adminpanel/registrations/${registration.id}/`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          authRedirect: "/admin/login",
+        }
+      );
+      const data = await readApiResponse(response);
+
+      if (!response.ok) {
+        if (response.status === 403) {
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("refresh_token");
+          localStorage.removeItem("user");
+          localStorage.removeItem("admin_user");
+          navigate("/admin/login", { replace: true });
+        }
+        throw new Error(data.detail || "Unable to delete this profile.");
+      }
+
+      setRegistrations((current) =>
+        current.filter((item) => item.id !== registration.id)
+      );
+      alert(data.message || "Profile deleted successfully.");
+    } catch (deleteError) {
+      console.error("Admin profile deletion error:", deleteError);
+      alert(deleteError.message || "Unable to delete this profile.");
+    } finally {
+      setDeletingRegistrationId(null);
+    }
   };
 
   // =====================================================
@@ -568,7 +612,7 @@ export default function AdminDashboard() {
 
                         {/* ACTION */}
 
-                        <td>
+                        <td className="admin-action-buttons">
 
                           <button
                             type="button"
@@ -580,6 +624,16 @@ export default function AdminDashboard() {
                             }
                           >
                             View
+                          </button>
+                          <button
+                            type="button"
+                            className="remove-profile-btn"
+                            onClick={() => handleRemove(registration)}
+                            disabled={deletingRegistrationId === registration.id}
+                          >
+                            {deletingRegistrationId === registration.id
+                              ? "Removing..."
+                              : "Remove"}
                           </button>
 
                         </td>

@@ -1,5 +1,8 @@
 from django.utils import timezone
+from django.db import transaction
 from django.db.models import OuterRef, Subquery
+
+import logging
 
 from rest_framework import status
 from rest_framework.response import Response
@@ -7,13 +10,15 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 
 from accounts.permissions import IsAdmin
-from registrations.models import Registration
+from registrations.models import ClientPhoto, Registration
 
-from .models import ProfileVerification
+from .models import ProfileChange, ProfileVerification
 from .serializers import (
     ProfileVerificationSerializer,
     RegistrationCheckingSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class AdminRegistrationListView(APIView):
@@ -89,6 +94,70 @@ class AdminRegistrationDetailView(APIView):
                 context={"request": request},
             ).data,
         })
+
+    def delete(self, request, pk):
+        try:
+            registration = Registration.objects.select_related("user").get(pk=pk)
+        except Registration.DoesNotExist:
+            return Response(
+                {"detail": "Registration not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        user = registration.user
+        stored_files = []
+        for field_name in (
+            "profile_photo",
+            "identity_document",
+            "additional_document",
+        ):
+            file_field = getattr(registration, field_name)
+            if file_field:
+                stored_files.append((file_field.storage, file_field.name))
+
+        for photo in ClientPhoto.objects.filter(registration=registration):
+            for field_name in ("photo", "pending_photo"):
+                file_field = getattr(photo, field_name)
+                if file_field:
+                    stored_files.append((file_field.storage, file_field.name))
+
+        for change in ProfileChange.objects.filter(registration=registration):
+            for field_name in (
+                "pending_profile_photo",
+                "pending_identity_document",
+                "pending_additional_document",
+            ):
+                file_field = getattr(change, field_name)
+                if file_field:
+                    stored_files.append((file_field.storage, file_field.name))
+
+        with transaction.atomic():
+            registration.delete()
+            if not Registration.objects.filter(user=user).exists():
+                user.delete()
+
+            transaction.on_commit(
+                lambda: self._delete_profile_files(stored_files, pk)
+            )
+
+        return Response({"message": "Profile deleted successfully."})
+
+    @staticmethod
+    def _delete_profile_files(stored_files, registration_id):
+        deleted = set()
+        for storage, file_name in stored_files:
+            key = (id(storage), file_name)
+            if key in deleted:
+                continue
+            deleted.add(key)
+            try:
+                storage.delete(file_name)
+            except Exception:
+                logger.exception(
+                    "Could not delete uploaded file for registration %s (file=%s)",
+                    registration_id,
+                    file_name,
+                )
 
 
 class AdminApproveRegistrationView(APIView):

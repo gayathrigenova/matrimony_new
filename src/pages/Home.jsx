@@ -25,25 +25,69 @@ const sliderContent = [
   }
 ];
 
-const dummyProfiles = [
-  { id: 1, name: 'Ananya Sharma', age: 25, profession: 'Software Engineer', location: 'Bangalore', img: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=500&q=80', gender: 'female', profileId: 'WN10293', caste: 'Thiyya' },
-  { id: 2, name: 'Rahul Verma', age: 28, profession: 'Investment Banker', location: 'Mumbai', img: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=500&q=80', gender: 'male', profileId: 'WN10294', caste: 'Ezhava' },
-  { id: 3, name: 'Priya Nair', age: 26, profession: 'Doctor', location: 'Kochi', img: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=500&q=80', gender: 'female', profileId: 'WN10295', caste: 'Thiyya' },
-  { id: 4, name: 'Karthik Menon', age: 29, profession: 'Architect', location: 'Chennai', img: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=500&q=80', gender: 'male', profileId: 'WN10296', caste: 'Ezhava' },
-  { id: 5, name: 'Sneha Patel', age: 24, profession: 'UX Designer', location: 'Pune', img: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=500&q=80', gender: 'female', profileId: 'WN10297', caste: 'Thiyya' },
-  { id: 6, name: 'Arjun Krishnan', age: 30, profession: 'IAS Officer', location: 'Delhi', img: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=500&q=80', gender: 'male', profileId: 'WN10298', caste: 'Ezhava' },
-  { id: 7, name: 'Meera Pillai', age: 27, profession: 'CA', location: 'Trivandrum', img: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=500&q=80', gender: 'female', profileId: 'WN10299', caste: 'Thiyya' },
-  { id: 8, name: 'Vishnu Das', age: 31, profession: 'Civil Engineer', location: 'Thrissur', img: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=500&q=80', gender: 'male', profileId: 'WN10300', caste: 'Ezhava' },
-  { id: 9, name: 'Lakshmi Raj', age: 25, profession: 'Teacher', location: 'Kozhikode', img: 'https://images.unsplash.com/photo-1489424731084-a5d8b219a5bb?auto=format&fit=crop&w=500&q=80', gender: 'female', profileId: 'WN10301', caste: 'Thiyya' },
-  { id: 10, name: 'Arun Kumar', age: 28, profession: 'Entrepreneur', location: 'Hyderabad', img: 'https://images.unsplash.com/photo-1463453091185-61582044d556?auto=format&fit=crop&w=500&q=80', gender: 'male', profileId: 'WN10302', caste: 'Ezhava' },
-];
-
 export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [gender, setGender] = useState('male');
   const [activeFilter, setActiveFilter] = useState('all');
+  const [profiles, setProfiles] = useState([]);
+  const [profilesLoading, setProfilesLoading] = useState(true);
+  const [profilesError, setProfilesError] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(hasAuthenticatedSession);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let active = true;
+    let requestInProgress = false;
+    let requestController;
+
+    const fetchProfiles = async () => {
+      if (requestInProgress) return;
+      requestInProgress = true;
+      requestController = new AbortController();
+
+      try {
+        const response = await fetch(`${API_URL}/registrations/published/`, {
+          cache: "no-store",
+          signal: requestController.signal,
+        });
+        const data = await readApiResponse(response);
+        if (!response.ok) {
+          throw new Error(data.detail || "Unable to load profiles.");
+        }
+
+        const results = Array.isArray(data) ? data : data.results;
+        if (!Array.isArray(results)) {
+          throw new Error("The profiles response was invalid.");
+        }
+
+        if (active) {
+          setProfiles(results.filter((profile) => profile.status === "PUBLISHED"));
+          setProfilesError("");
+        }
+      } catch (error) {
+        if (active && error.name !== "AbortError") {
+          setProfilesError(error.message || "Unable to load profiles.");
+        }
+      } finally {
+        requestInProgress = false;
+        if (active) setProfilesLoading(false);
+      }
+    };
+
+    fetchProfiles();
+    const refreshTimer = window.setInterval(fetchProfiles, 60_000);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") fetchProfiles();
+    };
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+
+    return () => {
+      active = false;
+      window.clearInterval(refreshTimer);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      requestController?.abort();
+    };
+  }, []);
 
   useEffect(() => {
     const refreshAuthStatus = () => setIsAuthenticated(hasAuthenticatedSession());
@@ -100,6 +144,10 @@ export default function Home() {
       }
     });
   };
+
+  const visibleProfiles = profiles.filter((profile) =>
+    activeFilter === 'all' || profile.gender?.toLowerCase() === activeFilter
+  );
 
   return (
     <div>
@@ -212,20 +260,38 @@ export default function Home() {
           </button>
         </div>
 
+        {profilesLoading && <p className="section-subtitle" role="status">Loading profiles...</p>}
+        {profilesError && <p className="section-subtitle" role="alert">{profilesError}</p>}
+        {!profilesLoading && !profilesError && visibleProfiles.length === 0 && (
+          <p className="section-subtitle" role="status">No profiles available at the moment.</p>
+        )}
+
         <div className="profiles-grid">
-          {dummyProfiles
-            .filter((profile) => activeFilter === 'all' || profile.gender === activeFilter)
-            .map((profile) => (
+          {visibleProfiles.map((profile) => (
               <div key={profile.id} className="profile-card">
-                <img src={profile.img} alt={profile.name} className="profile-img" />
+                {profile.profile_photo_url ? (
+                  <img src={profile.profile_photo_url} alt={profile.full_name} className="profile-img" />
+                ) : (
+                  <div className="profile-img profile-img-placeholder" role="img" aria-label="Profile photo unavailable" />
+                )}
                 <div className="profile-info">
-                  <h3>{profile.name}</h3>
-                  <p className="profile-id">{profile.profileId}</p>
-                  <p>{profile.age} yrs, {profile.profession}</p>
-                  <p>{profile.caste} • {profile.location}</p>
+                  <h3>{profile.full_name}</h3>
+                  <p className="profile-id">{profile.matrimony_id || "Profile ID unavailable"}</p>
+                  <p>
+                    {profile.age != null ? `${profile.age} yrs` : "Age unavailable"}
+                    {profile.occupation || profile.occupation_level
+                      ? `, ${profile.occupation || profile.occupation_level}`
+                      : ""}
+                  </p>
+                  <p>
+                    {[profile.religion, profile.caste].filter(Boolean).join(" • ") || "Religion/community not specified"}
+                  </p>
+                  <p>
+                    {[profile.city, profile.district, profile.state].filter(Boolean).join(", ") || "Location not specified"}
+                  </p>
                   <button 
                     className="view-profile-btn" 
-                    onClick={() => alert(`Connect request sent to ${profile.name}!`)}
+                    onClick={() => alert(`Connect request sent to ${profile.full_name}!`)}
                   >
                     Connect Me
                   </button>

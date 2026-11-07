@@ -564,6 +564,66 @@ class ProfileReviewWorkflowTests(TestCase):
         response = self.client_api.post(f"/api/adminpanel/registrations/{self.registration.pk}/approve/")
         self.assertEqual(response.status_code, 403)
 
+    def test_client_cannot_delete_registration(self):
+        response = self.client_api.delete(
+            f"/api/adminpanel/registrations/{self.registration.pk}/"
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Registration.objects.filter(pk=self.registration.pk).exists())
+
+    def test_admin_can_delete_profile_and_related_records(self):
+        ProfileVerification.objects.create(client=self.client_user)
+        ProfileChange.objects.create(
+            registration=self.registration,
+            user=self.client_user,
+        )
+        self.registration.photos.create(slot_index=1)
+
+        image_bytes = BytesIO()
+        Image.new("RGB", (2, 2), "blue").save(image_bytes, format="PNG")
+        self.registration.profile_photo.save(
+            "profile.png",
+            SimpleUploadedFile(
+                "profile.png",
+                image_bytes.getvalue(),
+                content_type="image/png",
+            ),
+            save=True,
+        )
+        profile_photo_storage = self.registration.profile_photo.storage
+        profile_photo_name = self.registration.profile_photo.name
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.admin_api.delete(
+                f"/api/adminpanel/registrations/{self.registration.pk}/"
+            )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertFalse(Registration.objects.filter(pk=self.registration.pk).exists())
+        self.assertFalse(ClientPhoto.objects.filter(registration=self.registration).exists())
+        self.assertFalse(ProfileChange.objects.filter(user=self.client_user).exists())
+        self.assertFalse(ProfileVerification.objects.filter(client=self.client_user).exists())
+        self.assertFalse(User.objects.filter(pk=self.client_user.pk).exists())
+        self.assertFalse(profile_photo_storage.exists(profile_photo_name))
+
+    def test_deleting_one_profile_keeps_account_with_other_profiles(self):
+        other_registration = Registration.objects.create(
+            user=self.client_user,
+            full_name="Another Profile",
+            gender="Female",
+            date_of_birth=date(1997, 1, 1),
+        )
+
+        response = self.admin_api.delete(
+            f"/api/adminpanel/registrations/{self.registration.pk}/"
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertFalse(Registration.objects.filter(pk=self.registration.pk).exists())
+        self.assertTrue(Registration.objects.filter(pk=other_registration.pk).exists())
+        self.assertTrue(User.objects.filter(pk=self.client_user.pk).exists())
+
     def test_registration_list_is_available_to_admin_but_forbidden_to_client(self):
         client_response = self.client_api.get("/api/adminpanel/registrations/")
         admin_response = self.admin_api.get("/api/adminpanel/registrations/")

@@ -297,6 +297,10 @@
   object-fit: cover;
 }
 
+.profile-img-placeholder {
+  background-color: #f1f3f2;
+}
+
 .profile-info {
   padding: 1rem;
 }

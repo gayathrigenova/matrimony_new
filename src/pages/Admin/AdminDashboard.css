@@ -230,6 +230,32 @@
   background: #008f4c;
 }
 
+.admin-action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.remove-profile-btn {
+  border: none;
+  background: #e53935;
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.remove-profile-btn:hover {
+  background: #c62828;
+}
+
+.remove-profile-btn:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
 
 /* ================= EMPTY STATE ================= */
 

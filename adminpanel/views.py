@@ -149,6 +149,72 @@ class AdminRegistrationDetailView(APIView):
             "pending_photos": pending_photos,
         })
 
+    def delete(self, request, pk):
+        try:
+            registration = Registration.objects.select_related("user").get(pk=pk)
+        except Registration.DoesNotExist:
+            return Response(
+                {"detail": "Registration not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        user = registration.user
+        stored_files = []
+        file_fields = (
+            "profile_photo",
+            "horoscope_file",
+            "identity_document",
+            "additional_document",
+        )
+        for field_name in file_fields:
+            file_field = getattr(registration, field_name)
+            if file_field:
+                stored_files.append((file_field.storage, file_field.name))
+
+        for photo in registration.photos.all():
+            for field_name in ("photo", "pending_photo"):
+                file_field = getattr(photo, field_name)
+                if file_field:
+                    stored_files.append((file_field.storage, file_field.name))
+
+        for change in registration.profile_changes.all():
+            for field_name in (
+                "pending_profile_photo",
+                "pending_identity_document",
+                "pending_additional_document",
+            ):
+                file_field = getattr(change, field_name)
+                if file_field:
+                    stored_files.append((file_field.storage, file_field.name))
+
+        with transaction.atomic():
+            registration.delete()
+            if not Registration.objects.filter(user=user).exists():
+                user.delete()
+
+            transaction.on_commit(
+                lambda: self._delete_profile_files(stored_files, pk)
+            )
+
+        return Response({"message": "Profile deleted successfully."})
+
+    @staticmethod
+    def _delete_profile_files(stored_files, registration_id):
+        deleted = set()
+        for storage, file_name in stored_files:
+            key = (id(storage), file_name)
+            if key in deleted:
+                continue
+            deleted.add(key)
+            try:
+                storage.delete(file_name)
+            except Exception:
+                logger.exception(
+                    "Could not delete uploaded file for registration %s (file=%s)",
+                    registration_id,
+                    file_name,
+                )
+
 
 class AdminApproveRegistrationView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]

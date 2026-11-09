@@ -288,6 +288,22 @@ class PublicProfileSerializer(serializers.ModelSerializer):
         return None
 
 
+class FeaturedProfileSerializer(PublicProfileSerializer):
+    class Meta(PublicProfileSerializer.Meta):
+        fields = [
+            "id",
+            "matrimony_id",
+            "full_name",
+            "age",
+            "occupation",
+            "occupation_level",
+            "caste",
+            "district",
+            "state",
+            "profile_photo_url",
+        ]
+
+
 # =========================================================
 # CLIENT PROFILE SERIALIZER
 # =========================================================

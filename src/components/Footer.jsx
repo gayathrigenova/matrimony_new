@@ -33,8 +33,8 @@ export default function Footer() {
           <h4>Our Community</h4>
           <ul>
             <li><a href="#profiles">Verified Profiles</a></li>
-            <li><a href="#success">Success Stories</a></li>
-            <li><a href="#safety">Safety Tips</a></li>
+            {/* <li><a href="#success">Success Stories</a></li>
+            <li><a href="#safety">Safety Tips</a></li> */}
             <li><a href="#faq">FAQs</a></li>
           </ul>
         </div>

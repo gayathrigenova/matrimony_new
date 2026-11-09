@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import './Navbar.css';
 import logo from '../assets/logo1.png';
-import { API_URL, hasAuthenticatedSession, readApiResponse } from '../api.js';
+import { API_URL, fetchWithTokenRefresh, hasAuthenticatedSession, readApiResponse } from '../api.js';
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -17,8 +17,13 @@ export default function Navbar() {
 
   useEffect(() => {
     const refreshAuthStatus = () => {
+      const clientSession = hasClientSession();
       setIsLoggedIn(hasAuthenticatedSession());
-      setIsClientLoggedIn(hasClientSession());
+      setIsClientLoggedIn(clientSession);
+      if (!clientSession) {
+        searchRequestRef.current += 1;
+        setSearchState({ status: "idle", profile: null, message: "" });
+      }
     };
     window.addEventListener('auth-change', refreshAuthStatus);
     window.addEventListener('storage', refreshAuthStatus);
@@ -64,10 +69,17 @@ export default function Navbar() {
       return;
     }
 
+    if (!hasClientSession()) {
+      const returnTo = `/profiles?matrimony_id=${encodeURIComponent(matrimonyId)}`;
+      setSearchOpen(false);
+      navigate("/login", { state: { returnTo } });
+      return;
+    }
+
     setSearchState({ status: "loading", profile: null, message: "" });
     try {
       const query = new URLSearchParams({ matrimony_id: matrimonyId });
-      const response = await fetch(
+      const response = await fetchWithTokenRefresh(
         `${API_URL}/registrations/published/by-matrimony-id/?${query.toString()}`,
       );
       const data = await readApiResponse(response);

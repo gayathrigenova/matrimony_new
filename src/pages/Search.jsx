@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BIRTH_STAR_OPTIONS, CASTE_OPTIONS } from '../constants.js';
-import { API_URL, readApiResponse } from '../api.js';
+import { API_URL, fetchWithTokenRefresh, readApiResponse } from '../api.js';
 import './Search.css';
 
 export default function Search() {
@@ -45,7 +45,9 @@ export default function Search() {
     if (filters.birthStar) query.set('birth_star', filters.birthStar);
 
     try {
-      const response = await fetch(`${API_URL}/registrations/published/?${query.toString()}`);
+      const response = await fetchWithTokenRefresh(
+        `${API_URL}/registrations/published/?${query.toString()}`,
+      );
       const data = await readApiResponse(response);
       if (!response.ok) {
         throw new Error(data.detail || 'Unable to search profiles.');

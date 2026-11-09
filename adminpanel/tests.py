@@ -14,6 +14,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import User
 from adminpanel.models import ProfileChange, ProfileVerification
+from notifications.models import Notification
 from registrations.models import ClientPhoto, Registration
 
 
@@ -665,6 +666,14 @@ class ProfileReviewWorkflowTests(TestCase):
             registration=self.registration,
             user=self.client_user,
         )
+        notification = Notification.objects.create(
+            recipient=self.admin_user,
+            sender=self.client_user,
+            registration=self.registration,
+            notification_type=Notification.NotificationType.PROFILE_UPDATED,
+            title="Profile updated",
+            message="The profile was updated.",
+        )
         self.registration.photos.create(slot_index=1)
 
         image_bytes = BytesIO()
@@ -692,6 +701,8 @@ class ProfileReviewWorkflowTests(TestCase):
         self.assertFalse(ProfileChange.objects.filter(user=self.client_user).exists())
         self.assertFalse(ProfileVerification.objects.filter(client=self.client_user).exists())
         self.assertFalse(User.objects.filter(pk=self.client_user.pk).exists())
+        notification.refresh_from_db()
+        self.assertIsNone(notification.registration_id)
         self.assertFalse(profile_photo_storage.exists(profile_photo_name))
 
     def test_deleting_one_profile_keeps_account_with_other_profiles(self):

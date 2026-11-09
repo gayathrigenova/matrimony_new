@@ -1,54 +1,79 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { API_URL } from "../api.js";
+import { Link, useSearchParams } from "react-router-dom";
+import { API_URL, fetchWithTokenRefresh, readApiResponse } from "../api.js";
 import "./Profile.css";
 
 export default function Profiles() {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const birthStar = searchParams.get("birth_star") || "";
-  const [profiles, setProfiles] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const matrimonyId = (searchParams.get("matrimony_id") || "").replace(/\s+/g, "");
+  const searchKey = new URLSearchParams({ birthStar, matrimonyId }).toString();
+  const [result, setResult] = useState(null);
+  const loading = !result || result.key !== searchKey;
+  const profiles = result?.key === searchKey ? result.profiles : [];
+  const error = result?.key === searchKey ? result.error : "";
   const [pendingAction, setPendingAction] = useState(null);
   const [sentInterestIds, setSentInterestIds] = useState(() => new Set());
   const [shortlistedProfileIds, setShortlistedProfileIds] = useState(() => new Set());
   const [actionFeedback, setActionFeedback] = useState({ id: null, type: "", text: "" });
 
   useEffect(() => {
+    let active = true;
     const query = new URLSearchParams();
-    if (birthStar) query.set("birth_star", birthStar);
-    const queryString = query.toString();
-    fetch(`${API_URL}/registrations/published/${queryString ? `?${queryString}` : ""}`)
+    let endpoint;
+    if (matrimonyId) {
+      query.set("matrimony_id", matrimonyId);
+      endpoint = `${API_URL}/registrations/published/by-matrimony-id/?${query.toString()}`;
+    } else {
+      if (birthStar) query.set("birth_star", birthStar);
+      const queryString = query.toString();
+      endpoint = `${API_URL}/registrations/published/${queryString ? `?${queryString}` : ""}`;
+    }
+
+    fetchWithTokenRefresh(endpoint)
       .then(async (response) => {
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(data.detail || "Unable to load profiles.");
-        setProfiles(Array.isArray(data) ? data : data.results || []);
+        const data = await readApiResponse(response);
+        if (!response.ok) {
+          throw new Error(data.detail || "Unable to load profiles.");
+        }
+        if (active) {
+          setResult({
+            key: searchKey,
+            profiles: matrimonyId ? [data] : Array.isArray(data) ? data : data.results || [],
+            error: "",
+          });
+        }
       })
-      .catch((requestError) => setError(requestError.message))
-      .finally(() => setLoading(false));
-  }, [birthStar]);
+      .catch((requestError) => {
+        if (active) {
+          setResult({
+            key: searchKey,
+            profiles: [],
+            error: requestError.message || "Unable to load profiles.",
+          });
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [birthStar, matrimonyId, searchKey]);
 
   const handleProfileAction = async (profileId, action) => {
     const token = localStorage.getItem("access_token");
-    if (!token) {
-      navigate("/login");
-      return;
-    }
-
     const actionName = action === "interest" ? "Interest" : "Shortlist";
     setPendingAction({ id: profileId, action });
     setActionFeedback({ id: null, type: "", text: "" });
 
     try {
-      const response = await fetch(`${API_URL}/registrations/${profileId}/${action}/`, {
+      const response = await fetchWithTokenRefresh(`${API_URL}/registrations/${profileId}/${action}/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
       });
-      const data = await response.json().catch(() => ({}));
+      const data = await readApiResponse(response);
       if (!response.ok) {
         throw new Error(data.detail || "Unable to send interest.");
       }
@@ -83,21 +108,23 @@ export default function Profiles() {
   return (
     <div className="profiles-page">
       <div className="profiles-header">
-        <h1>Verified Matrimony Profiles</h1>
-        <p>Browse profiles approved and published by our team.</p>
+        <h1>{matrimonyId ? "Matrimony ID Search" : "Verified Matrimony Profiles"}</h1>
+        <p>{matrimonyId ? `Search result for ${matrimonyId}` : "Browse profiles approved and published by our team."}</p>
       </div>
 
       {loading ? <p role="status">Loading published profiles…</p> : null}
       {error ? <p role="alert">{error}</p> : null}
-      {!loading && !error && profiles.length === 0 ? <p>No published profiles are available yet.</p> : null}
+      {!loading && !error && profiles.length === 0 ? (
+        <p>{matrimonyId ? "No profile found for this Matrimony ID." : "No published profiles are available yet."}</p>
+      ) : null}
 
       <div className="profiles-grid">
         {profiles.map((profile) => (
           <article className="profile-card" key={profile.id}>
             <ProfilePhoto url={profile.profile_photo_url} name={profile.full_name} />
             <div className="profile-content">
+              <h3>{profile.full_name || "Profile"}</h3>
               <span className="profile-id">{profile.matrimony_id || "Verified profile"}</span>
-              <h3>{profile.full_name}</h3>
               {profile.age ? <p><strong>Age:</strong> {profile.age} years</p> : null}
               {profile.occupation ? <p><strong>Job:</strong> {profile.occupation}</p> : null}
               {profile.state ? <p><strong>State:</strong> {profile.state}</p> : null}

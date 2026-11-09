@@ -8,7 +8,11 @@ import {
 } from "lucide-react";
 
 import './Home.css';
-import { API_URL, hasAuthenticatedSession, readApiResponse } from "../api.js";
+import {
+  API_URL,
+  hasAuthenticatedSession,
+  readApiResponse,
+} from "../api.js";
 
 const sliderContent = [
   {
@@ -46,7 +50,7 @@ export default function Home() {
       requestController = new AbortController();
 
       try {
-        const response = await fetch(`${API_URL}/registrations/published/`, {
+        const response = await fetch(`${API_URL}/registrations/featured/`, {
           cache: "no-store",
           signal: requestController.signal,
         });
@@ -61,7 +65,7 @@ export default function Home() {
         }
 
         if (active) {
-          setProfiles(results.filter((profile) => profile.status === "PUBLISHED"));
+          setProfiles(results);
           setProfilesError("");
         }
       } catch (error) {
@@ -90,7 +94,9 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const refreshAuthStatus = () => setIsAuthenticated(hasAuthenticatedSession());
+    const refreshAuthStatus = () => {
+      setIsAuthenticated(hasAuthenticatedSession());
+    };
     window.addEventListener('auth-change', refreshAuthStatus);
     window.addEventListener('storage', refreshAuthStatus);
     return () => {
@@ -238,21 +244,20 @@ export default function Home() {
       <div className="section-container">
         <h2 className="section-title1">Featured Matches</h2>
         <p className="section-subtitle">Handpicked potential profiles matching high compatibility standards</p>
-        
         <div className="featured-filter-tabs">
-          <button 
+          <button
             className={`filter-tab ${activeFilter === 'all' ? 'active' : ''}`}
             onClick={() => setActiveFilter('all')}
           >
             All
           </button>
-          <button 
+          <button
             className={`filter-tab ${activeFilter === 'female' ? 'active' : ''}`}
             onClick={() => setActiveFilter('female')}
           >
             Female
           </button>
-          <button 
+          <button
             className={`filter-tab ${activeFilter === 'male' ? 'active' : ''}`}
             onClick={() => setActiveFilter('male')}
           >
@@ -268,35 +273,40 @@ export default function Home() {
 
         <div className="profiles-grid">
           {visibleProfiles.map((profile) => (
-              <div key={profile.id} className="profile-card">
-                {profile.profile_photo_url ? (
-                  <img src={profile.profile_photo_url} alt={profile.full_name} className="profile-img" />
-                ) : (
-                  <div className="profile-img profile-img-placeholder" role="img" aria-label="Profile photo unavailable" />
-                )}
-                <div className="profile-info">
-                  <h3>
-                    {profile.full_name || "Profile"}
-                    {profile.matrimony_id ? ` (${profile.matrimony_id})` : ""}
-                  </h3>
-                  <p>
-                    {[
-                      profile.age != null ? `${profile.age} Yrs` : "",
-                      profile.occupation || profile.occupation_level,
-                      profile.caste,
-                    ].filter(Boolean).join(", ") || "Profile details unavailable"}
-                  </p>
-                  <p>
-                    {[profile.district, profile.state].filter(Boolean).join(", ") || "Location not specified"}
-                  </p>
-                  <div className="home-profile-actions">
-                    <Link className="home-view-profile-btn" to={`/profiles/${profile.id}`}>
-                      View Profile
-                    </Link>
-                  </div>
+            <Link
+              key={profile.id}
+              className="profile-card"
+              to={`/profiles/${profile.id}`}
+              aria-label={`View ${profile.full_name}'s profile`}
+            >
+              {profile.profile_photo_url ? (
+                <img src={profile.profile_photo_url} alt={profile.full_name} className="profile-img" />
+              ) : (
+                <div className="profile-img profile-img-placeholder" role="img" aria-label="Profile photo unavailable" />
+              )}
+              <div className="profile-info">
+                <h3>
+                  {profile.full_name || "Profile"}
+                  {profile.matrimony_id ? ` (${profile.matrimony_id})` : ""}
+                </h3>
+                <p>
+                  {[
+                    profile.age != null ? `${profile.age} Yrs` : "",
+                    profile.occupation || profile.occupation_level,
+                    profile.caste,
+                  ].filter(Boolean).join(", ") || "Profile details unavailable"}
+                </p>
+                <p>
+                  {[profile.district, profile.state].filter(Boolean).join(", ") || "Location not specified"}
+                </p>
+                <div className="home-profile-actions">
+                  <span className="home-view-profile-btn">
+                    View Profile
+                  </span>
                 </div>
               </div>
-            ))}
+            </Link>
+          ))}
         </div>
       </div>
 

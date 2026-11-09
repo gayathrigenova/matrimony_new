@@ -31,7 +31,7 @@
 .profiles-page .profile-card {
   display: flex;
   flex-direction: column;
-  height: 520px;
+  min-height: 0;
   background: #fff;
   border-radius: 12px;
   overflow: hidden;
@@ -67,8 +67,8 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  min-height: 0;
-  padding: 14px 16px;
+  min-width: 0;
+  padding: 12px;
 }
 
 .profiles-page .profile-id {
@@ -108,36 +108,45 @@
 
 .profiles-page .profile-card-actions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
   margin-top: auto;
-  padding-top: 12px;
+  padding-top: 8px;
 }
 
-.view-btn {
+.profiles-page .view-btn,
+.profiles-page .interest-btn,
+.profiles-page .shortlist-btn {
   display: flex;
-  flex: 1;
+  min-width: 0;
+  height: 36px;
+  box-sizing: border-box;
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 10px;
+  padding: 6px 4px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.profiles-page .view-btn {
   background: linear-gradient(135deg, #00ab5b, #010b05);
   color: white;
   text-decoration: none;
-  border-radius: 8px;
-  font-weight: 600;
   transition: 0.3s;
 }
 
-.interest-btn {
-  flex: 1;
-  padding: 10px;
+.profiles-page .interest-btn {
   background: #e5f5ec;
   color: #075c35;
   border: 1px solid #b8e3ca;
-  border-radius: 8px;
   font: inherit;
+  font-size: 12px;
   font-weight: 600;
+  line-height: 1.2;
   cursor: pointer;
   transition: 0.3s;
 }
@@ -151,15 +160,14 @@
   opacity: 0.7;
 }
 
-.shortlist-btn {
-  flex: 1;
-  padding: 10px;
+.profiles-page .shortlist-btn {
   background: #fffaf0;
   color: #744210;
   border: 1px solid #feebc8;
-  border-radius: 8px;
   font: inherit;
+  font-size: 12px;
   font-weight: 600;
+  line-height: 1.2;
   cursor: pointer;
   transition: 0.3s;
 }
@@ -186,8 +194,21 @@
   color: #b42318;
 }
 
-.view-btn:hover {
+.profiles-page .view-btn:hover {
   background: linear-gradient(135deg, #00ab5b, #022113);
+}
+
+@media (max-width: 420px) {
+  .profiles-page .profile-card-actions {
+    gap: 4px;
+  }
+
+  .profiles-page .view-btn,
+  .profiles-page .interest-btn,
+  .profiles-page .shortlist-btn {
+    padding: 6px 2px;
+    font-size: 11px;
+  }
 }
 
 @media (max-width: 992px) {

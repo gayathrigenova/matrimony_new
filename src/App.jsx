@@ -76,13 +76,13 @@ function AppLayout() {
           ========================= */}
 
           <Route path="/" element={<Home />} />
-          <Route path="/search" element={<Search />} />
+          <Route path="/search" element={<ClientOnlyRoute><Search /></ClientOnlyRoute>} />
           <Route path="/membership" element={<Membership />} />
           <Route path="/registration" element={<Registration />} />
           <Route path="/login" element={<Login />} />
           <Route path="/contact" element={<Contact />} />
-          <Route path="/profiles" element={<Profiles />} />
-          <Route path="/profiles/:id" element={<PublicProfileDetails />} />
+          <Route path="/profiles" element={<ClientOnlyRoute><Profiles /></ClientOnlyRoute>} />
+          <Route path="/profiles/:id" element={<ClientOnlyRoute><PublicProfileDetails /></ClientOnlyRoute>} />
 
           {/* Registration Steps */}
           <Route path="/registration-details" element={<RegistrationDetails />} />
@@ -128,21 +128,23 @@ function AppLayout() {
 }
 
 function ClientOnlyRoute({ children }) {
+  const location = useLocation();
+  const returnTo = `${location.pathname}${location.search}${location.hash}`;
   if (!localStorage.getItem("access_token")) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" state={{ returnTo }} replace />;
   }
 
   let role;
   try {
     role = JSON.parse(localStorage.getItem("user") || "null")?.role;
   } catch {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" state={{ returnTo }} replace />;
   }
 
   if (role === "CLIENT") return children;
   if (role === "ADMIN") return <Navigate to="/admin/dashboard" replace />;
   if (role === "BROKER") return <Navigate to="/broker/dashboard" replace />;
-  return <Navigate to="/login" replace />;
+  return <Navigate to="/login" state={{ returnTo }} replace />;
 }
 
 function AdminOnlyRoute({ children }) {

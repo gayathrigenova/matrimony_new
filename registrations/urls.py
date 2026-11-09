@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     RegistrationCreateView,
     RegistrationAvailabilityView,
+    FeaturedRegistrationListView,
     VerificationStartView,
     VerificationCodeView,
     VerificationResendView,
@@ -55,8 +56,14 @@ urlpatterns = [
 
 
     # =========================================================
-    # PUBLIC - PUBLISHED PROFILES
+    # CLIENT - PUBLISHED PROFILES
     # =========================================================
+
+    path(
+        "featured/",
+        FeaturedRegistrationListView.as_view(),
+        name="featured-registrations",
+    ),
 
     path(
         "published/",

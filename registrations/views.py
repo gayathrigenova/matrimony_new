@@ -38,6 +38,7 @@ from .models import (
 
 from .serializers import (
     RegistrationSerializer,
+    FeaturedProfileSerializer,
     PublicProfileSerializer,
     ClientProfileSerializer,
     ProfileViewSerializer,
@@ -57,6 +58,14 @@ from .verification import (
 
 
 logger = logging.getLogger(__name__)
+
+
+class IsClientUser(IsAuthenticated):
+    def has_permission(self, request, view):
+        return (
+            super().has_permission(request, view)
+            and getattr(request.user, "role", None) == "CLIENT"
+        )
 
 
 def _changed_profile_fields(registration, values):
@@ -676,14 +685,24 @@ class VerificationResendView(APIView):
 
 
 # =========================================================
-# PUBLIC - PUBLISHED PROFILES
+# CLIENT - PUBLISHED PROFILES
 # LIST + SEARCH FILTERS
 # =========================================================
+
+class FeaturedRegistrationListView(generics.ListAPIView):
+    serializer_class = FeaturedProfileSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        return Registration.objects.filter(
+            status=Registration.Status.PUBLISHED
+        ).order_by("-published_at")
+
 
 class PublishedRegistrationListView(generics.ListAPIView):
 
     serializer_class = PublicProfileSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsClientUser]
 
     def get_queryset(self):
 
@@ -835,7 +854,7 @@ class PublishedRegistrationListView(generics.ListAPIView):
 
 class PublishedRegistrationByMatrimonyIdView(APIView):
 
-    permission_classes = [AllowAny]
+    permission_classes = [IsClientUser]
 
     def get(self, request):
         matrimony_id = "".join(
@@ -863,7 +882,7 @@ class PublishedRegistrationByMatrimonyIdView(APIView):
 
 
 # =========================================================
-# PUBLIC - SINGLE PROFILE
+# CLIENT - SINGLE PROFILE
 # =========================================================
 
 class PublishedRegistrationDetailView(
@@ -875,7 +894,7 @@ class PublishedRegistrationDetailView(
     )
 
     serializer_class = PublicProfileSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsClientUser]
 
 
 # =========================================================

@@ -65,7 +65,9 @@ class RegistrationBirthStarTests(TestCase):
             status=Registration.Status.PUBLISHED,
         )
 
-        response = APIClient().get(
+        client = APIClient()
+        client.force_authenticate(matching_user)
+        response = client.get(
             "/api/registrations/published/",
             {"birth_star": "ashwathi"},
         )
@@ -107,7 +109,9 @@ class RegistrationBirthStarTests(TestCase):
             status=Registration.Status.PUBLISHED,
         )
 
-        response = APIClient().get(
+        client = APIClient()
+        client.force_authenticate(matching_user)
+        response = client.get(
             "/api/registrations/published/",
             {"education": "Undergraduate"},
         )
@@ -206,7 +210,9 @@ class RegistrationBirthStarTests(TestCase):
             status=Registration.Status.APPROVED,
         )
 
-        response = APIClient().get(
+        client = APIClient()
+        client.force_authenticate(matching_user)
+        response = client.get(
             "/api/registrations/published/",
             {
                 "gender": "Female",
@@ -252,7 +258,16 @@ class PublishedMatrimonyIdSearchTests(TestCase):
             status=Registration.Status.PUBLISHED,
         )
 
+    def test_profile_search_requires_an_authenticated_member(self):
+        response = self.client.get(
+            "/api/registrations/published/by-matrimony-id/",
+            {"matrimony_id": "WN100004"},
+        )
+
+        self.assertEqual(response.status_code, 401)
+
     def test_search_is_case_insensitive_and_ignores_spaces(self):
+        self.client.force_authenticate(self.user)
         response = self.client.get(
             "/api/registrations/published/by-matrimony-id/",
             {"matrimony_id": "  wn 100004  "},
@@ -267,6 +282,7 @@ class PublishedMatrimonyIdSearchTests(TestCase):
         self.assertNotIn("contact_phone", response.data)
 
     def test_search_returns_requested_not_found_message(self):
+        self.client.force_authenticate(self.user)
         response = self.client.get(
             "/api/registrations/published/by-matrimony-id/",
             {"matrimony_id": "WN999999"},
@@ -279,6 +295,7 @@ class PublishedMatrimonyIdSearchTests(TestCase):
         )
 
     def test_search_does_not_return_unpublished_profiles(self):
+        self.client.force_authenticate(self.user)
         self.profile.status = Registration.Status.APPROVED
         self.profile.save(update_fields=["status"])
 
@@ -288,6 +305,33 @@ class PublishedMatrimonyIdSearchTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 404)
+
+    def test_published_profile_list_and_detail_require_authentication(self):
+        list_response = self.client.get("/api/registrations/published/")
+        detail_response = self.client.get(
+            f"/api/registrations/published/{self.profile.pk}/",
+        )
+
+        self.assertEqual(list_response.status_code, 401)
+        self.assertEqual(detail_response.status_code, 401)
+
+    def test_published_profile_endpoints_reject_non_client_users(self):
+        self.user.role = User.Role.ADMIN
+        self.user.save(update_fields=["role"])
+        self.client.force_authenticate(self.user)
+
+        responses = [
+            self.client.get("/api/registrations/published/"),
+            self.client.get(
+                f"/api/registrations/published/{self.profile.pk}/",
+            ),
+            self.client.get(
+                "/api/registrations/published/by-matrimony-id/",
+                {"matrimony_id": "WN100004"},
+            ),
+        ]
+
+        self.assertEqual([response.status_code for response in responses], [403, 403, 403])
 
 
 class RegistrationDuplicateValidationTests(TestCase):

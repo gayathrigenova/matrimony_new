@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { API_URL } from "../api.js";
+import { API_URL, fetchWithTokenRefresh, readApiResponse } from "../api.js";
 import PremiumProfileInfo from "../components/PremiumProfileInfo";
 import "./ProfileDetails.css";
 
@@ -14,15 +14,23 @@ export default function ProfileDetails() {
   const photoFailed = photoFailureFor === id;
 
   useEffect(() => {
-    fetch(`${API_URL}/registrations/published/${id}/`)
+    let active = true;
+    fetchWithTokenRefresh(`${API_URL}/registrations/published/${id}/`)
       .then(async (response) => {
-        const data = await response.json().catch(() => ({}));
+        const data = await readApiResponse(response);
         if (!response.ok) throw new Error(data.detail || "Published profile not found.");
-        setError("");
-        setProfile(data);
+        if (active) setProfile(data);
       })
-      .catch((requestError) => setError(requestError.message))
-      .finally(() => setLoadedId(id));
+      .catch((requestError) => {
+        if (active) setError(requestError.message || "Published profile not found.");
+      })
+      .finally(() => {
+        if (active) setLoadedId(id);
+      });
+
+    return () => {
+      active = false;
+    };
   }, [id]);
 
   if (loading) {

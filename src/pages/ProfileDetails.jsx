@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { API_URL } from "../api.js";
+import PremiumProfileInfo from "../components/PremiumProfileInfo";
 import "./ProfileDetails.css";
 
 export default function ProfileDetails() {
@@ -59,8 +60,6 @@ export default function ProfileDetails() {
     ["Caste", profile.caste],
     ["Birth star", profile.birth_star],
     ["Location", location],
-  ];
-  const personalDetails = [
     ["Date of birth", profile.date_of_birth],
     [
       "Disability",
@@ -68,6 +67,7 @@ export default function ProfileDetails() {
         ? profile.disability
         : "",
     ],
+    ["Native place", profile.place],
   ];
   const educationDetails = [
     ["Education level", profile.education_level],
@@ -90,8 +90,6 @@ export default function ProfileDetails() {
     ["Married sisters", profile.married_sisters],
     ["Family financial level", profile.financial_level],
   ];
-  const hometownDetails = [["Native place", profile.place]];
-
   return (
     <main className="public-profile-page">
       <div className="public-profile-breadcrumb">
@@ -122,9 +120,7 @@ export default function ProfileDetails() {
         </div>
       </div>
       <div className="public-profile-sections">
-        {personalDetails.some(([, value]) => hasProfileValue(value)) ? (
-          <ProfileSection title="Personal Details" details={personalDetails} />
-        ) : null}
+        <PremiumProfileInfo profileId={profile.id} />
         {educationDetails.some(([, value]) => hasProfileValue(value)) ? (
           <ProfileSection title="Education & Career" details={educationDetails} />
         ) : null}
@@ -134,9 +130,6 @@ export default function ProfileDetails() {
             <ProfileDetailGrid details={familyDetails} />
             {profile.about_family ? <p className="public-profile-description">{profile.about_family}</p> : null}
           </section>
-        ) : null}
-        {hometownDetails.some(([, value]) => hasProfileValue(value)) ? (
-          <ProfileSection title="Native Place" details={hometownDetails} />
         ) : null}
         {profile.about ? (
           <section className="public-profile-section-card">

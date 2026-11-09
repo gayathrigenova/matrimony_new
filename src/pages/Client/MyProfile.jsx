@@ -170,6 +170,9 @@ export default function MyProfile() {
                 <span className={`badge-status ${getStatusClass(profile.status)}`}>
                   {formatStatus(profile.status)}
                 </span>
+                <span className="contact-credit-balance" role="status">
+                  <strong>{profile.contacts_remaining ?? 0}</strong> Contacts Remaining
+                </span>
               </div>
             </div>
           </div>

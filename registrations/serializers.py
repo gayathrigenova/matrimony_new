@@ -295,6 +295,7 @@ class PublicProfileSerializer(serializers.ModelSerializer):
 class ClientProfileSerializer(serializers.ModelSerializer):
 
     email = serializers.EmailField(required=False, write_only=True)
+    contacts_remaining = serializers.SerializerMethodField()
     age = serializers.SerializerMethodField()
     profile_photo_url = serializers.SerializerMethodField()
     horoscope_file_url = serializers.SerializerMethodField()
@@ -387,6 +388,7 @@ class ClientProfileSerializer(serializers.ModelSerializer):
             "contact_phone",
             "extra_phone",
             "email",
+            "contacts_remaining",
             "status",
             "correction_reason",
             "rejection_reason",
@@ -399,6 +401,7 @@ class ClientProfileSerializer(serializers.ModelSerializer):
             "id",
             "matrimony_id",
             "age",
+            "contacts_remaining",
             "profile_photo_url",
             "horoscope_file_url",
             "identity_document_url",
@@ -428,6 +431,12 @@ class ClientProfileSerializer(serializers.ModelSerializer):
             - obj.date_of_birth.year
             - ((today.month, today.day) < (obj.date_of_birth.month, obj.date_of_birth.day))
         )
+
+    def get_contacts_remaining(self, obj):
+        from memberships.models import ContactCreditBalance
+
+        balance = ContactCreditBalance.objects.filter(user=obj.user).first()
+        return balance.remaining_contacts if balance else 0
 
     def get_profile_photo_url(self, obj):
         request = self.context.get("request")

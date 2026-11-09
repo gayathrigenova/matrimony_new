@@ -2,6 +2,7 @@ import { API_URL } from "../../api.js";
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import ClientLayout from "../../components/ClientLayout";
+import PremiumProfileInfo from "../../components/PremiumProfileInfo";
 import "./ProfileDetails.css";
 
 
@@ -189,6 +190,8 @@ export default function ProfileDetails() {
             <DetailItem label="Disability" value={profile.disability} />
           </div>
         </div>
+
+        <PremiumProfileInfo profileId={profile.id} />
 
         {/* ABOUT ME */}
         {profile.about && (

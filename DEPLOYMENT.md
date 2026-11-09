@@ -23,6 +23,10 @@ applies migrations and starts Gunicorn. Set:
 - `ADMIN_NOTIFICATION_EMAIL`: destination for profile review notices.
 - `ADMIN_DASHBOARD_URL`: frontend origin used for admin review links.
 - `FRONTEND_URL`: frontend origin used in client emails.
+- `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`: Razorpay API credentials for
+  creating membership orders and confirming captured payments. Keep the secret
+  only in Railway variables.
+- `RAZORPAY_WEBHOOK_SECRET`: secret configured for the Razorpay webhook below.
 - `OTP_EXPIRY_SECONDS` (default `300`), `OTP_RESEND_COOLDOWN_SECONDS`
   (default `60`), and `OTP_MAX_ATTEMPTS` (default `5`): positive integer OTP
   policy values.
@@ -89,6 +93,21 @@ The build command also runs the asset verification. In Django, existing
 `/assets/...` files are served with their file MIME type; missing asset paths
 return a plain-text 404 and are excluded from the React Router fallback.
 Redeploy the Railway service after code changes.
+
+### Gold membership contact credits
+
+The Gold plan checkout uses Razorpay. Configure a Razorpay webhook to send the
+`payment.captured` event to
+`https://<backend-host>/api/memberships/razorpay/webhook/`, and set the matching
+webhook secret as `RAZORPAY_WEBHOOK_SECRET`. The backend grants 20 contact
+credits only after confirming the payment signature, captured status, amount
+(₹1,499), and INR currency. A confirmed order can grant credits only once.
+
+Credits are stored against the member account, decrease once per distinct
+profile whose contact details are unlocked, and are not consumed again when a
+member revisits that profile. They remain in the account until used; logging out
+does not reset them. The frontend loads Razorpay Checkout from Razorpay's
+official checkout script.
 
 ## Verification
 

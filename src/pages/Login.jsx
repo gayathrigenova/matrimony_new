@@ -1,10 +1,11 @@
 import { API_URL } from "../api.js";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import "./Login.css";
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -46,8 +47,14 @@ export default function Login() {
       localStorage.setItem("user", JSON.stringify(data.user));
       window.dispatchEvent(new Event("auth-change"));
 
+      const requestedDestination = location.state?.returnTo;
+      const clientDestination = typeof requestedDestination === "string"
+        && requestedDestination.startsWith("/")
+        && !requestedDestination.startsWith("//")
+        ? requestedDestination
+        : "/dashboard";
       const destination = data.user.role === "CLIENT"
-        ? "/dashboard"
+        ? clientDestination
         : data.user.role === "ADMIN"
           ? "/admin/dashboard"
           : data.user.role === "BROKER"

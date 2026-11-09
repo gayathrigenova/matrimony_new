@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Mail,
   MessageCircle,
@@ -289,12 +289,11 @@ export default function Home() {
                   <p>
                     {[profile.city, profile.district, profile.state].filter(Boolean).join(", ") || "Location not specified"}
                   </p>
-                  <button 
-                    className="view-profile-btn" 
-                    onClick={() => alert(`Connect request sent to ${profile.full_name}!`)}
-                  >
-                    Connect Me
-                  </button>
+                  <div className="home-profile-actions">
+                    <Link className="home-view-profile-btn" to={`/profiles/${profile.id}`}>
+                      View Profile
+                    </Link>
+                  </div>
                 </div>
               </div>
             ))}

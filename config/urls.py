@@ -83,6 +83,9 @@ urlpatterns = [
     # Account / Login API
     path("api/accounts/", include("accounts.urls")),
 
+    # Membership payments and contact credits
+    path("api/memberships/", include("memberships.urls")),
+
     # Admin Panel API
     path("api/adminpanel/", include("adminpanel.urls")),
 

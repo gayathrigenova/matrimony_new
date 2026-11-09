@@ -84,6 +84,24 @@
 .badge-status.correction_required { background: #fff0eb; color: #c97862; }
 .badge-status.rejected { background: #fae9e9; color: #c66767; }
 
+.contact-credit-balance {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border: 1px solid #b8e3ca;
+  border-radius: 20px;
+  background: #e5f5ec;
+  color: #075c35;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.contact-credit-balance strong {
+  font-size: 14px;
+}
+
 .edit-profile-btn {
   background: var(--primary);
   color: white;

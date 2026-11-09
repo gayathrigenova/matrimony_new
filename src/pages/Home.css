@@ -329,11 +329,37 @@
   padding: 0;
 }
 
+.home-profile-actions {
+  display: block;
+  margin-top: 0.75rem;
+}
+
+.home-view-profile-btn {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 0.6rem 0.35rem;
+  border: 1px solid #00ab5b;
+  border-radius: 8px;
+  color: #008244;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.home-view-profile-btn:hover {
+  background: #e8f7ef;
+}
+
 .view-profile-btn {
   display: block;
   width: 100%;
-  padding: 0.6rem;
-  margin-top: 0.75rem;
+  min-width: 0;
+  padding: 0.6rem 0.35rem;
+  margin-top: 0;
   background: #00ab5b;
   color: #ffffff;
   border: none;

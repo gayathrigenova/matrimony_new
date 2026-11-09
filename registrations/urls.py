@@ -7,6 +7,7 @@ from .views import (
     VerificationCodeView,
     VerificationResendView,
     PublishedRegistrationListView,
+    PublishedRegistrationByMatrimonyIdView,
     PublishedRegistrationDetailView,
     PendingRegistrationListView,
     RegistrationDetailView,
@@ -61,6 +62,12 @@ urlpatterns = [
         "published/",
         PublishedRegistrationListView.as_view(),
         name="published-registrations"
+    ),
+
+    path(
+        "published/by-matrimony-id/",
+        PublishedRegistrationByMatrimonyIdView.as_view(),
+        name="published-registration-by-matrimony-id"
     ),
 
     path(

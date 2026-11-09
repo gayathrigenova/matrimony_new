@@ -231,6 +231,65 @@ class RegistrationBirthStarTests(TestCase):
         self.assertNotIn("email", results[0])
 
 
+class PublishedMatrimonyIdSearchTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            email="matrimony-search@example.com",
+            password="test-password",
+        )
+        self.profile = Registration.objects.create(
+            user=self.user,
+            matrimony_id="WN100004",
+            full_name="Anjali",
+            gender="Female",
+            date_of_birth=date(2003, 1, 22),
+            occupation="Software Developer",
+            caste="Thiyya",
+            district="Kollam",
+            state="Kerala",
+            phone="9876543210",
+            status=Registration.Status.PUBLISHED,
+        )
+
+    def test_search_is_case_insensitive_and_ignores_spaces(self):
+        response = self.client.get(
+            "/api/registrations/published/by-matrimony-id/",
+            {"matrimony_id": "  wn 100004  "},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["id"], self.profile.id)
+        self.assertEqual(response.data["full_name"], "Anjali")
+        self.assertEqual(response.data["matrimony_id"], "WN100004")
+        self.assertNotIn("phone", response.data)
+        self.assertNotIn("email", response.data)
+        self.assertNotIn("contact_phone", response.data)
+
+    def test_search_returns_requested_not_found_message(self):
+        response = self.client.get(
+            "/api/registrations/published/by-matrimony-id/",
+            {"matrimony_id": "WN999999"},
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(
+            response.data["detail"],
+            "No profile found for this Matrimony ID.",
+        )
+
+    def test_search_does_not_return_unpublished_profiles(self):
+        self.profile.status = Registration.Status.APPROVED
+        self.profile.save(update_fields=["status"])
+
+        response = self.client.get(
+            "/api/registrations/published/by-matrimony-id/",
+            {"matrimony_id": "WN100004"},
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+
 class RegistrationDuplicateValidationTests(TestCase):
     def setUp(self):
         self.client = APIClient()

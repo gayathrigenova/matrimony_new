@@ -1,14 +1,16 @@
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import './Navbar.css';
 import logo from '../assets/logo1.png';
-import { hasAuthenticatedSession } from '../api.js';
+import { API_URL, hasAuthenticatedSession, readApiResponse } from '../api.js';
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
+  const [searchState, setSearchState] = useState({ status: "idle", profile: null, message: "" });
+  const searchRequestRef = useRef(0);
   const navigate = useNavigate();
   const [isLoggedIn, setIsLoggedIn] = useState(hasAuthenticatedSession);
   const [isClientLoggedIn, setIsClientLoggedIn] = useState(hasClientSession);
@@ -49,12 +51,52 @@ export default function Navbar() {
     navigate('/');
   };
 
-  const handleSearchSubmit = (e) => {
+  const handleSearchSubmit = async (e) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
-      setSearchOpen(false);
+    const requestId = ++searchRequestRef.current;
+    const matrimonyId = searchQuery.replace(/\s+/g, "");
+    if (!matrimonyId) {
+      setSearchState({
+        status: "error",
+        profile: null,
+        message: "Enter a Matrimony ID to search.",
+      });
+      return;
     }
+
+    setSearchState({ status: "loading", profile: null, message: "" });
+    try {
+      const query = new URLSearchParams({ matrimony_id: matrimonyId });
+      const response = await fetch(
+        `${API_URL}/registrations/published/by-matrimony-id/?${query.toString()}`,
+      );
+      const data = await readApiResponse(response);
+      if (!response.ok) {
+        throw new Error(data.detail || "Unable to search profiles.");
+      }
+      if (requestId !== searchRequestRef.current) return;
+      setSearchState({ status: "success", profile: data, message: "" });
+    } catch (error) {
+      if (requestId !== searchRequestRef.current) return;
+      setSearchState({
+        status: "error",
+        profile: null,
+        message: error.message || "Unable to search profiles.",
+      });
+    }
+  };
+
+  const handleSearchInputChange = (event) => {
+    searchRequestRef.current += 1;
+    setSearchQuery(event.target.value);
+    setSearchState({ status: "idle", profile: null, message: "" });
+  };
+
+  const openSearchedProfile = (profileId) => {
+    searchRequestRef.current += 1;
+    navigate(`/profiles/${profileId}`);
+    setSearchOpen(false);
+    setSearchState({ status: "idle", profile: null, message: "" });
   };
 
   return (
@@ -84,12 +126,13 @@ export default function Navbar() {
           <form onSubmit={handleSearchSubmit}>
             <input
               type="text"
-              placeholder="Search Profile ID / Keyword"
+              placeholder="Search Matrimony ID"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={handleSearchInputChange}
               autoFocus
             />
             <button type="submit">⌕</button>
+            <ProfileIdSearchResult state={searchState} onOpen={openSearchedProfile} />
           </form>
         </div>
       )}
@@ -131,10 +174,11 @@ export default function Navbar() {
           <span className="wn-search-icon">⌕</span>
           <input
             type="text"
-            placeholder="Search Profile ID / Keyword"
+            placeholder="Search Matrimony ID"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={handleSearchInputChange}
           />
+          <ProfileIdSearchResult state={searchState} onOpen={openSearchedProfile} />
         </form>
         {isLoggedIn ? (
           <button type="button" className="wn-login-btn" onClick={handleLogout}>
@@ -147,6 +191,42 @@ export default function Navbar() {
         )}
       </div>
     </nav>
+  );
+}
+
+function ProfileIdSearchResult({ state, onOpen }) {
+  if (state.status === "idle") return null;
+
+  return (
+    <div className="wn-profile-search-result" aria-live="polite">
+      {state.status === "loading" ? (
+        <p role="status">Searching profiles…</p>
+      ) : state.status === "error" ? (
+        <p role="alert">{state.message}</p>
+      ) : (
+        <button
+          type="button"
+          className="wn-profile-search-match"
+          onClick={() => onOpen(state.profile.id)}
+        >
+          <strong>
+            {state.profile.full_name}
+            {state.profile.matrimony_id ? ` (${state.profile.matrimony_id})` : ""}
+          </strong>
+          <span>
+            {[
+              state.profile.age != null ? `${state.profile.age} Yrs` : "",
+              state.profile.occupation || state.profile.occupation_level,
+              state.profile.caste,
+            ].filter(Boolean).join(", ")}
+          </span>
+          <span>
+            {[state.profile.district, state.profile.state].filter(Boolean).join(", ")}
+          </span>
+          <span className="wn-profile-search-open">View Profile</span>
+        </button>
+      )}
+    </div>
   );
 }
 

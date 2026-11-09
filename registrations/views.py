@@ -833,6 +833,35 @@ class PublishedRegistrationListView(generics.ListAPIView):
         return queryset
 
 
+class PublishedRegistrationByMatrimonyIdView(APIView):
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        matrimony_id = "".join(
+            request.query_params.get("matrimony_id", "").split()
+        ).upper()
+        if not matrimony_id:
+            return Response(
+                {"detail": "Enter a Matrimony ID to search."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        profile = Registration.objects.filter(
+            status=Registration.Status.PUBLISHED,
+            matrimony_id__iexact=matrimony_id,
+        ).first()
+        if not profile:
+            return Response(
+                {"detail": "No profile found for this Matrimony ID."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(
+            PublicProfileSerializer(profile, context={"request": request}).data
+        )
+
+
 # =========================================================
 # PUBLIC - SINGLE PROFILE
 # =========================================================

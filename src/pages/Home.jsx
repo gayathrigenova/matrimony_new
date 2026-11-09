@@ -275,19 +275,19 @@ export default function Home() {
                   <div className="profile-img profile-img-placeholder" role="img" aria-label="Profile photo unavailable" />
                 )}
                 <div className="profile-info">
-                  <h3>{profile.full_name}</h3>
-                  <p className="profile-id">{profile.matrimony_id || "Profile ID unavailable"}</p>
+                  <h3>
+                    {profile.full_name || "Profile"}
+                    {profile.matrimony_id ? ` (${profile.matrimony_id})` : ""}
+                  </h3>
                   <p>
-                    {profile.age != null ? `${profile.age} yrs` : "Age unavailable"}
-                    {profile.occupation || profile.occupation_level
-                      ? `, ${profile.occupation || profile.occupation_level}`
-                      : ""}
+                    {[
+                      profile.age != null ? `${profile.age} Yrs` : "",
+                      profile.occupation || profile.occupation_level,
+                      profile.caste,
+                    ].filter(Boolean).join(", ") || "Profile details unavailable"}
                   </p>
                   <p>
-                    {[profile.religion, profile.caste].filter(Boolean).join(" • ") || "Religion/community not specified"}
-                  </p>
-                  <p>
-                    {[profile.city, profile.district, profile.state].filter(Boolean).join(", ") || "Location not specified"}
+                    {[profile.district, profile.state].filter(Boolean).join(", ") || "Location not specified"}
                   </p>
                   <div className="home-profile-actions">
                     <Link className="home-view-profile-btn" to={`/profiles/${profile.id}`}>

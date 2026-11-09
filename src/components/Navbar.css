@@ -125,6 +125,56 @@
   align-items: center;
 }
 
+.wn-profile-search-result {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 1100;
+  width: 100%;
+  min-width: 260px;
+  overflow: hidden;
+  border: 1px solid #e6e6e6;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+  color: #333;
+}
+
+.wn-profile-search-result > p {
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 0.85rem;
+}
+
+.wn-profile-search-match {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 14px;
+  border: 0;
+  background: #fff;
+  color: #333;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wn-profile-search-match:hover,
+.wn-profile-search-match:focus-visible {
+  background: #f2faf5;
+}
+
+.wn-profile-search-match > span {
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.wn-profile-search-match .wn-profile-search-open {
+  color: #008244;
+  font-weight: 600;
+}
+
 .wn-search-icon {
   position: absolute;
   left: 12px;
@@ -215,6 +265,7 @@
 }
 
 .wn-mobile-search-bar form {
+  position: relative;
   display: flex;
   gap: 0.5rem;
 }
@@ -236,6 +287,11 @@
   padding: 0.6rem 1rem;
   font-size: 1rem;
   cursor: pointer;
+}
+
+.wn-mobile-search-bar .wn-profile-search-result {
+  top: calc(100% + 8px);
+  min-width: 0;
 }
 
 .wn-menu-toggle {

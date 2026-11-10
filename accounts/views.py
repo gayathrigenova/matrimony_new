@@ -1,15 +1,42 @@
+import hashlib
+import logging
+import os
+import smtplib
+from urllib.parse import urljoin
+
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.core.exceptions import ImproperlyConfigured
+from django.core.mail import EmailMultiAlternatives
+from django.db import transaction
+from django.template.loader import render_to_string
+from django.utils.encoding import force_str
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from django.db import transaction
+from rest_framework.throttling import ScopedRateThrottle
 
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .serializers import LoginSerializer
+from .password_reset import PasswordResetToken
+from .serializers import (
+    LoginSerializer,
+    PasswordResetConfirmSerializer,
+    PasswordResetRequestSerializer,
+)
 from notifications.emailing import notify_profile_update
 from adminpanel.models import ProfileChange, ProfileVerification
 from registrations.models import Registration
+
+
+logger = logging.getLogger(__name__)
+User = get_user_model()
+PASSWORD_RESET_MESSAGE = (
+    "If an account exists with this email, a password reset link has been sent."
+)
+INVALID_RESET_LINK_MESSAGE = "This password reset link is invalid or has expired."
 
 
 class LoginView(APIView):
@@ -38,6 +65,155 @@ class LoginView(APIView):
         return Response(
             serializer.errors,
             status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+class PasswordResetRequestView(APIView):
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "password_reset"
+
+    def post(self, request):
+        if not isinstance(request.data, dict):
+            return Response(
+                {"detail": "A valid email address is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.filter(
+            email__iexact=serializer.validated_data["email"],
+            is_active=True,
+        ).first()
+        if user:
+            raw_token = PasswordResetToken.generate_for_user(user)
+            token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+            uid = urlsafe_base64_encode(force_str(user.pk).encode())
+            frontend_url = (
+                os.getenv("FRONTEND_URL", "").strip().rstrip("/")
+                or "https://matrimony-sepia-phi.vercel.app"
+            )
+            reset_url = urljoin(
+                f"{frontend_url}/",
+                f"reset-password/{uid}/{raw_token}",
+            )
+
+            try:
+                context = {
+                    "full_name": user.full_name or "there",
+                    "reset_url": reset_url,
+                    "expiry_minutes": PasswordResetToken.EXPIRY_MINUTES,
+                }
+                message = EmailMultiAlternatives(
+                    subject="Reset your Matrimony password",
+                    body=render_to_string(
+                        "accounts/password_reset_email.txt",
+                        context,
+                    ),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    to=[user.email],
+                )
+                message.attach_alternative(
+                    render_to_string(
+                        "accounts/password_reset_email.html",
+                        context,
+                    ),
+                    "text/html",
+                )
+                sent_count = message.send(fail_silently=False)
+                if sent_count != 1:
+                    PasswordResetToken.objects.filter(
+                        token_hash=token_hash,
+                        used=False,
+                    ).update(used=True)
+                    logger.error("Password reset email was not accepted by the configured email backend.")
+            except (
+                OSError,
+                smtplib.SMTPException,
+                ImproperlyConfigured,
+                ValueError,
+            ) as exc:
+                PasswordResetToken.objects.filter(
+                    token_hash=token_hash,
+                    used=False,
+                ).update(used=True)
+                logger.error(
+                    "Password reset email delivery failed (%s).",
+                    type(exc).__name__,
+                )
+
+        return Response(
+            {"message": PASSWORD_RESET_MESSAGE},
+            status=status.HTTP_200_OK,
+        )
+
+
+class PasswordResetConfirmView(APIView):
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "password_reset_confirm"
+
+    def post(self, request):
+        if not isinstance(request.data, dict):
+            return Response(
+                {"detail": INVALID_RESET_LINK_MESSAGE},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        uid = request.data.get("uid")
+        raw_token = request.data.get("token")
+        if (
+            not isinstance(uid, str)
+            or len(uid) > 64
+            or not isinstance(raw_token, str)
+            or len(raw_token) > 128
+        ):
+            return Response(
+                {"detail": INVALID_RESET_LINK_MESSAGE},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            token = PasswordResetToken.verify(raw_token, lock=True)
+            if not token:
+                return Response(
+                    {"detail": INVALID_RESET_LINK_MESSAGE},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            try:
+                decoded_uid = force_str(urlsafe_base64_decode(uid))
+            except (TypeError, ValueError, UnicodeDecodeError):
+                return Response(
+                    {"detail": INVALID_RESET_LINK_MESSAGE},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if decoded_uid != str(token.user_id) or not token.user.is_active:
+                return Response(
+                    {"detail": INVALID_RESET_LINK_MESSAGE},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            serializer = PasswordResetConfirmSerializer(
+                data=request.data,
+                context={"user": token.user},
+            )
+            if not serializer.is_valid():
+                return Response(
+                    serializer.errors,
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            token.user.set_password(serializer.validated_data["new_password"])
+            token.user.save(update_fields=["password", "updated_at"])
+            token.mark_used()
+
+        return Response(
+            {"message": "Your password has been reset successfully."},
+            status=status.HTTP_200_OK,
         )
 
 

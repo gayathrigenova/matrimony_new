@@ -16,6 +16,8 @@ import RegistrationDetails from "./pages/RegistrationDetails1";
 import RegistrationStep3 from "./pages/RegistrationD3";
 
 import NotFound from "./pages/NotFound";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 // Admin
 import AdminLogin from "./pages/Admin/AdminLogin";
@@ -87,6 +89,8 @@ function AppLayout() {
           {/* Registration Steps */}
           <Route path="/registration-details" element={<RegistrationDetails />} />
           <Route path="/registration-details3" element={<RegistrationStep3 />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password/:uid/:token" element={<ResetPassword />} />
 
           {/* =========================
               ADMIN

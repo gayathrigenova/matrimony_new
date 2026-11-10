@@ -1,12 +1,18 @@
 from datetime import date
 import os
+import re
+import smtplib
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.test import TestCase, override_settings
+from django.core.cache import cache
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.utils import timezone
 
 from .models import User
+from .password_reset import PasswordResetToken
 from django.core import mail
 from adminpanel.models import ProfileChange, ProfileVerification
 from registrations.models import Registration
@@ -51,6 +57,144 @@ class TokenRefreshTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 401)
+
+
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    DEFAULT_FROM_EMAIL="no-reply@example.com",
+)
+class PasswordResetTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            email="reset@example.com",
+            password="OriginalPassword#2026",
+            full_name="Reset User",
+        )
+        self.client = APIClient()
+
+    def request_reset(self):
+        return self.client.post(
+            "/api/accounts/password-reset/",
+            {"email": self.user.email},
+            format="json",
+        )
+
+    def get_reset_link(self):
+        response = self.request_reset()
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(
+            response.data["message"],
+            "If an account exists with this email, a password reset link has been sent.",
+        )
+        html_body = mail.outbox[-1].alternatives[0][0]
+        match = re.search(
+            r'href="([^"]+/reset-password/([^/]+)/([^/"?]+))"',
+            html_body,
+        )
+        self.assertIsNotNone(match)
+        return match.group(2), match.group(3)
+
+    def test_request_response_does_not_disclose_account_existence(self):
+        known_response = self.request_reset()
+        unknown_response = self.client.post(
+            "/api/accounts/password-reset/",
+            {"email": "unknown@example.com"},
+            format="json",
+        )
+
+        self.assertEqual(known_response.status_code, 200)
+        self.assertEqual(unknown_response.status_code, 200)
+        self.assertEqual(known_response.data, unknown_response.data)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].from_email, "no-reply@example.com")
+
+    def test_reset_changes_password_and_token_cannot_be_reused(self):
+        uid, raw_token = self.get_reset_link()
+        stored_token = PasswordResetToken.objects.get(user=self.user)
+        self.assertNotEqual(stored_token.token_hash, raw_token)
+        self.assertIn("Reset Password", mail.outbox[0].alternatives[0][0])
+        self.assertIn(raw_token, mail.outbox[0].body)
+
+        response = self.client.post(
+            "/api/accounts/password-reset-confirm/",
+            {
+                "uid": uid,
+                "token": raw_token,
+                "new_password": "SecureReset#2026",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("SecureReset#2026"))
+        self.assertTrue(stored_token.__class__.objects.get(pk=stored_token.pk).used)
+
+        replay_response = self.client.post(
+            "/api/accounts/password-reset-confirm/",
+            {
+                "uid": uid,
+                "token": raw_token,
+                "new_password": "AnotherSecure#2026",
+            },
+            format="json",
+        )
+        self.assertEqual(replay_response.status_code, 400)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("SecureReset#2026"))
+
+    def test_expired_reset_link_is_rejected(self):
+        uid, raw_token = self.get_reset_link()
+        token = PasswordResetToken.objects.get(user=self.user)
+        PasswordResetToken.objects.filter(pk=token.pk).update(
+            created_at=timezone.now() - timedelta(minutes=31),
+        )
+
+        response = self.client.post(
+            "/api/accounts/password-reset-confirm/",
+            {
+                "uid": uid,
+                "token": raw_token,
+                "new_password": "SecureReset#2026",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["detail"], "This password reset link is invalid or has expired.")
+        token.refresh_from_db()
+        self.assertTrue(token.used)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("OriginalPassword#2026"))
+
+    def test_invalid_password_does_not_consume_reset_link(self):
+        uid, raw_token = self.get_reset_link()
+
+        response = self.client.post(
+            "/api/accounts/password-reset-confirm/",
+            {
+                "uid": uid,
+                "token": raw_token,
+                "new_password": "123",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("new_password", response.data)
+        self.assertIsNotNone(PasswordResetToken.verify(raw_token))
+
+    @patch(
+        "accounts.views.EmailMultiAlternatives.send",
+        side_effect=smtplib.SMTPException("SMTP delivery failed"),
+    )
+    def test_email_delivery_failure_invalidates_issued_token(self, _send):
+        response = self.request_reset()
+
+        self.assertEqual(response.status_code, 200)
+        token = PasswordResetToken.objects.get(user=self.user)
+        self.assertTrue(token.used)
 
 
 class AccountContactNotificationTests(TestCase):

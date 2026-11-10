@@ -1,6 +1,31 @@
 from rest_framework import serializers
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
+
 from .models import User
 from adminpanel.models import ProfileVerification
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        return value.strip().lower()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    new_password = serializers.CharField(
+        write_only=True,
+        trim_whitespace=False,
+        max_length=128,
+    )
+
+    def validate_new_password(self, value):
+        try:
+            validate_password(value, user=self.context["user"])
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.messages) from exc
+        return value
 
 
 class LoginSerializer(serializers.Serializer):

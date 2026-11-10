@@ -96,3 +96,6 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return f"{self.username} - {self.full_name} ({self.email})"
+
+
+from .password_reset import PasswordResetToken  # noqa: F401

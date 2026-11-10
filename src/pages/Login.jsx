@@ -148,7 +148,7 @@ export default function Login() {
             <button
               type="button"
               className="login-forgot-btn"
-              onClick={() => alert("Forgot password feature coming soon.")}
+              onClick={() => navigate('/forgot-password')}
             >
               Forgot Password?
             </button>

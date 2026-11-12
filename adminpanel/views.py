@@ -3,16 +3,18 @@ from django.db import transaction
 from django.db.models import Q
 from pathlib import Path
 
-from rest_framework import status
+from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from accounts.permissions import IsAdmin
 from registrations.models import ClientPhoto, Registration
 
-from .models import ProfileVerification
+from .models import FAQ, ProfileVerification
 from .serializers import (
+    FAQSerializer,
+    FAQReorderSerializer,
     ProfileVerificationSerializer,
     RegistrationCheckingSerializer,
 )
@@ -25,6 +27,51 @@ import logging
 from datetime import date
 
 logger = logging.getLogger(__name__)
+
+
+class PublicFAQListView(generics.ListAPIView):
+    serializer_class = FAQSerializer
+    queryset = FAQ.objects.filter(is_active=True).order_by("sort_order", "id")
+    permission_classes = [AllowAny]
+
+
+class AdminFAQListCreateView(generics.ListCreateAPIView):
+    serializer_class = FAQSerializer
+    queryset = FAQ.objects.all().order_by("sort_order", "id")
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+
+class AdminFAQDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = FAQSerializer
+    queryset = FAQ.objects.all()
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+
+class AdminFAQReorderView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def post(self, request):
+        serializer = FAQReorderSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        faq_ids = serializer.validated_data["faq_ids"]
+        existing_ids = set(FAQ.objects.values_list("id", flat=True))
+        if set(faq_ids) != existing_ids:
+            return Response(
+                {"faq_ids": ["Provide every FAQ ID exactly once to reorder FAQs."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            faqs = list(FAQ.objects.filter(id__in=faq_ids))
+            faqs_by_id = {faq.id: faq for faq in faqs}
+            for position, faq_id in enumerate(faq_ids):
+                faqs_by_id[faq_id].sort_order = position + 1
+            FAQ.objects.bulk_update(faqs, ["sort_order"])
+
+        return Response(FAQSerializer(
+            [faqs_by_id[faq_id] for faq_id in faq_ids],
+            many=True,
+        ).data)
 
 
 def pending_change(registration):

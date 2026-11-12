@@ -9,6 +9,7 @@ import Membership from "./pages/Membership";
 import Registration from "./pages/Registration";
 import Login from "./pages/Login";
 import Contact from "./pages/Contact";
+import FAQ from "./pages/FAQ";
 import Profiles from "./pages/Profile";
 import PublicProfileDetails from "./pages/ProfileDetails";
 
@@ -23,6 +24,7 @@ import ResetPassword from "./pages/ResetPassword";
 import AdminLogin from "./pages/Admin/AdminLogin";
 import AdminDashboard from "./pages/Admin/AdminDashboard";
 import RegistrationReview from "./pages/Admin/RegistrationReview";
+import FAQManagement from "./pages/Admin/FAQManagement";
 
 // Client
 import ClientDashboard from "./pages/ClientDashboard";
@@ -83,6 +85,7 @@ function AppLayout() {
           <Route path="/registration" element={<Registration />} />
           <Route path="/login" element={<Login />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/faq" element={<FAQ />} />
           <Route path="/profiles" element={<ClientOnlyRoute><Profiles /></ClientOnlyRoute>} />
           <Route path="/profiles/:id" element={<ClientOnlyRoute><PublicProfileDetails /></ClientOnlyRoute>} />
 
@@ -98,6 +101,7 @@ function AppLayout() {
 
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin/dashboard" element={<AdminOnlyRoute><AdminDashboard /></AdminOnlyRoute>} />
+          <Route path="/admin/faqs" element={<AdminOnlyRoute><FAQManagement /></AdminOnlyRoute>} />
           <Route path="/admin/view/:id" element={<AdminOnlyRoute><RegistrationReview /></AdminOnlyRoute>} />
 
           {/* =========================

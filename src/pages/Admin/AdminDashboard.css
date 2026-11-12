@@ -43,6 +43,22 @@
   transition: 0.3s;
 }
 
+.faq-management-link {
+  border: 1px solid #00ab5b;
+  background: #ffffff;
+  color: #008244;
+  padding: 10px 18px;
+  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.faq-management-link:hover {
+  background: #eff8f2;
+}
+
 .logout-btn:hover {
   background: #c62828;
 }
@@ -331,6 +347,10 @@
   }
 
   .logout-btn {
+    width: 100%;
+  }
+
+  .faq-management-link {
     width: 100%;
   }
 

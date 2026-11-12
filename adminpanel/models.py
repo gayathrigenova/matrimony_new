@@ -169,3 +169,30 @@ class ProfileChange(models.Model):
 
     def __str__(self):
         return f"Change Request #{self.id} for {self.registration.matrimony_id} ({self.status})"
+
+
+class FAQ(models.Model):
+    class Category(models.TextChoices):
+        GENERAL = "general", "General Questions"
+        ACCOUNT = "account", "Registration & Account"
+        PROFILE = "profile", "Profile Management"
+        SEARCH = "search", "Profile Search & Enquiries"
+        MEMBERSHIP = "membership", "Membership & Payment"
+        SECURITY = "security", "Security & Privacy"
+        SUPPORT = "support", "Support"
+
+    category = models.CharField(max_length=20, choices=Category.choices)
+    question = models.CharField(max_length=255)
+    answer = models.TextField()
+    is_active = models.BooleanField(default=True)
+    sort_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["sort_order", "id"]
+        verbose_name = "FAQ"
+        verbose_name_plural = "FAQs"
+
+    def __str__(self):
+        return self.question

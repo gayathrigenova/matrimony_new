@@ -360,6 +360,13 @@ export default function AdminDashboard() {
 
         <button
           type="button"
+          onClick={() => navigate("/admin/faqs")}
+          className="faq-management-link"
+        >
+          Manage FAQs
+        </button>
+        <button
+          type="button"
           onClick={logout}
           className="logout-btn"
         >

@@ -1,16 +1,24 @@
 from django.urls import path
 
 from .views import (
+    AdminFAQDetailView,
+    AdminFAQListCreateView,
+    AdminFAQReorderView,
     AdminRegistrationListView,
     AdminRegistrationDetailView,
     AdminApproveRegistrationView,
     AdminCorrectionRegistrationView,
     AdminRejectRegistrationView,
     AdminPublishRegistrationView,
+    PublicFAQListView,
 )
 
 
 urlpatterns = [
+    path("faqs/", PublicFAQListView.as_view(), name="public-faq-list"),
+    path("faqs/manage/", AdminFAQListCreateView.as_view(), name="admin-faq-list"),
+    path("faqs/manage/reorder/", AdminFAQReorderView.as_view(), name="admin-faq-reorder"),
+    path("faqs/manage/<int:pk>/", AdminFAQDetailView.as_view(), name="admin-faq-detail"),
     path(
         "registrations/",
         AdminRegistrationListView.as_view(),

@@ -1,4 +1,4 @@
-import React from 'react';
+import { Link } from 'react-router-dom';
 import './Footer.css';
 import logo from '../assets/logo_km1.png';
 
@@ -35,7 +35,7 @@ export default function Footer() {
             <li><a href="#profiles">Verified Profiles</a></li>
             {/* <li><a href="#success">Success Stories</a></li>
             <li><a href="#safety">Safety Tips</a></li> */}
-            <li><a href="#faq">FAQs</a></li>
+            <li><Link to="/faq">FAQs</Link></li>
           </ul>
         </div>
 

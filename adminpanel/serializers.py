@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import ProfileVerification
+from .models import FAQ, ProfileVerification
 from registrations.models import Registration
 
 
@@ -69,3 +69,31 @@ class RegistrationCheckingSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+
+class FAQSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FAQ
+        fields = [
+            "id",
+            "category",
+            "question",
+            "answer",
+            "is_active",
+            "sort_order",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class FAQReorderSerializer(serializers.Serializer):
+    faq_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        allow_empty=True,
+    )
+
+    def validate_faq_ids(self, faq_ids):
+        if len(faq_ids) != len(set(faq_ids)):
+            raise serializers.ValidationError("FAQ IDs must be unique.")
+        return faq_ids

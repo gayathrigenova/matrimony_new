@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     "enquiries",
     "adminpanel",
     "notifications",
+    "anymail",
 ]
 
 

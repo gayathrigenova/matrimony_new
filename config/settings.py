@@ -310,7 +310,7 @@ if IS_RAILWAY:
 # EMAIL
 # =========================================================
 
-EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
 EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
@@ -327,13 +327,8 @@ if EMAIL_USE_TLS and EMAIL_USE_SSL:
     raise ImproperlyConfigured(
         "EMAIL_USE_TLS and EMAIL_USE_SSL cannot both be enabled."
     )
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
-EMAIL_BACKEND = os.getenv(
-    "EMAIL_BACKEND",
-    "django.core.mail.backends.smtp.EmailBackend"
-    if EMAIL_HOST or os.getenv("RAILWAY_ENVIRONMENT")
-    else "django.core.mail.backends.console.EmailBackend",
-)
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER).strip()
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
 OTP_EXPIRY_SECONDS = int(os.getenv("OTP_EXPIRY_SECONDS", "300"))
 OTP_RESEND_COOLDOWN_SECONDS = int(os.getenv("OTP_RESEND_COOLDOWN_SECONDS", "60"))

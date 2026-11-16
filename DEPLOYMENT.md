@@ -14,12 +14,15 @@ applies migrations and starts Gunicorn. Set:
 - `CSRF_TRUSTED_ORIGINS`: comma separated origins including `https://`.
 - `MYSQLHOST`, `MYSQLPORT`, `MYSQLDATABASE`, `MYSQLUSER`, `MYSQLPASSWORD`:
   Railway MySQL connection values.
-- `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`,
-  `DEFAULT_FROM_EMAIL`: SMTP settings from your email provider. Use port `587`
-  with `EMAIL_USE_TLS=true` and `EMAIL_USE_SSL=false`, or port `465` with
-  `EMAIL_USE_SSL=true` and `EMAIL_USE_TLS=false`. The application rejects
-  enabling TLS and SSL together. `EMAIL_TIMEOUT` sets the SMTP connection
-  timeout in seconds (default `10`). Keep credentials only in Railway variables.
+- `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, `EMAIL_USE_SSL`,
+  `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL`: Gmail SMTP
+  settings. Use `smtp.gmail.com`, port `587`, `EMAIL_USE_TLS=true`, and
+  `EMAIL_USE_SSL=false`; set `EMAIL_HOST_USER` and `DEFAULT_FROM_EMAIL` to the
+  same full Gmail address, and use a Google App Password for
+  `EMAIL_HOST_PASSWORD`. The Django SMTP backend is configured by the app and
+  is not selected through a Railway variable. `EMAIL_TIMEOUT` sets the SMTP
+  connection timeout in seconds (default `10`). Keep credentials only in
+  Railway variables.
 - `ADMIN_NOTIFICATION_EMAIL`: destination for profile review notices.
 - `ADMIN_DASHBOARD_URL`: frontend origin used for admin review links.
 - `FRONTEND_URL`: frontend origin used in client emails and password-reset
@@ -149,14 +152,16 @@ five minutes by default. A Railway test service can use `DEBUG=false` with
 `MOBILE_OTP_MODE=console` to write codes to Railway deployment logs. Enable this
 only on a non-production service; leave the mode `disabled` in production.
 
-Email settings are read from the Railway environment variables above. For
-Gmail, use `EMAIL_HOST=smtp.gmail.com`, `EMAIL_PORT=587`, `EMAIL_USE_TLS=true`,
-and `EMAIL_USE_SSL=false`; set `EMAIL_HOST_USER` to the full Gmail address and
-`EMAIL_HOST_PASSWORD` to a Google App Password (not the normal account
-password). `DEFAULT_FROM_EMAIL` should be that same verified address. Check the
-backend application logs for a credential-redacted SMTP exception name, status
-code, and server response when delivery fails. The application does not log
-SMTP credentials or return them in API errors.
+Email settings are read from Railway environment variables. The application
+defaults to Gmail host `smtp.gmail.com`, port `587`, TLS enabled, SSL disabled,
+and Django's SMTP backend. For production, set `EMAIL_HOST`,
+`EMAIL_PORT=587`, `EMAIL_USE_TLS=true`, `EMAIL_USE_SSL=false`,
+`EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, and `DEFAULT_FROM_EMAIL`; use a
+Google App Password (not the normal account password) and set the sender to
+the same verified Gmail address. Check the backend application logs for a
+credential-redacted SMTP exception, status code, and server diagnostic when
+delivery fails. The application does not log SMTP credentials or return them
+in API errors.
 
 The registration flow first requests email and mobile codes, verifies each
 code, then passes the one-time verification token through the existing

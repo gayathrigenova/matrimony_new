@@ -493,7 +493,9 @@ class ProfileReviewWorkflowTests(TestCase):
                     )
 
         self.assertEqual(response.status_code, 200, response.data)
-        self.assertTrue(any(record.exc_info for record in captured.records))
+        log_output = "\n".join(captured.output)
+        self.assertIn("exception=SMTPServerDisconnected", log_output)
+        self.assertIn("please run connect() first", log_output)
         self.registration.refresh_from_db()
         change.refresh_from_db()
         self.assertEqual(self.registration.full_name, "Approved Client")

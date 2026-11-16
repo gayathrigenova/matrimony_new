@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import smtplib
 
 from django.conf import settings
@@ -9,6 +10,27 @@ from django.utils import timezone
 
 
 logger = logging.getLogger(__name__)
+
+
+def safe_email_error(exc, sensitive_values=()):
+    response = getattr(exc, "smtp_error", None)
+    if isinstance(response, bytes):
+        response = response.decode("utf-8", errors="replace")
+    detail = str(response if response is not None else exc)
+    for secret in (
+        settings.EMAIL_HOST_PASSWORD,
+        settings.EMAIL_HOST_USER,
+        *sensitive_values,
+    ):
+        if secret:
+            detail = detail.replace(str(secret), "[redacted]")
+    detail = re.sub(
+        r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b",
+        "[redacted email]",
+        detail,
+    )
+    detail = re.sub(r"\b\d{6}\b", "[redacted code]", detail)
+    return detail.replace("\r", " ").replace("\n", " ")[:500]
 
 
 def send_profile_email(subject, body, recipient):
@@ -28,8 +50,14 @@ def send_profile_email(subject, body, recipient):
         smtplib.SMTPException,
         ImproperlyConfigured,
         ValueError,
-    ):
-        logger.exception("Profile notification delivery failed.")
+    ) as exc:
+        logger.error(
+            "Profile notification delivery failed: exception=%s smtp_code=%s "
+            "detail=%s",
+            type(exc).__name__,
+            getattr(exc, "smtp_code", None),
+            safe_email_error(exc, (recipient,)),
+        )
         return False
     if sent_count != 1:
         logger.error("Profile notification was not accepted by the configured email backend.")

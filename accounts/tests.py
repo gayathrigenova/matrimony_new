@@ -109,6 +109,31 @@ class PasswordResetTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].from_email, "no-reply@example.com")
 
+    @override_settings(
+        EMAIL_HOST_USER="private.sender@example.com",
+        EMAIL_HOST_PASSWORD="private-app-password",
+        DEFAULT_FROM_EMAIL="private.sender@example.com",
+    )
+    @patch(
+        "accounts.views.EmailMultiAlternatives.send",
+        side_effect=OSError(
+            "Could not connect as private.sender@example.com "
+            "with private-app-password"
+        ),
+    )
+    def test_oserror_logs_safe_smtp_diagnostic_and_invalidates_token(self, _send):
+        with self.assertLogs("accounts.views", level="ERROR") as captured:
+            response = self.request_reset()
+
+        self.assertEqual(response.status_code, 200)
+        token = PasswordResetToken.objects.get(user=self.user)
+        self.assertTrue(token.used)
+        log_output = "\n".join(captured.output)
+        self.assertIn("exception=OSError", log_output)
+        self.assertIn("Could not connect as", log_output)
+        self.assertNotIn("private.sender@example.com", log_output)
+        self.assertNotIn("private-app-password", log_output)
+
     def test_reset_changes_password_and_token_cannot_be_reused(self):
         uid, raw_token = self.get_reset_link()
         stored_token = PasswordResetToken.objects.get(user=self.user)

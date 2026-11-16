@@ -402,6 +402,7 @@ class RegistrationDuplicateValidationTests(TestCase):
                 format="json",
             )
             self.assertEqual(start.status_code, 200, start.data)
+            self.assertEqual(mail.outbox[0].from_email, "no-reply@example.com")
             email_otp = re.search(r"\b\d{6}\b", mail.outbox[0].body).group()
             mobile_otp = send_sms.call_args.args[1]
 

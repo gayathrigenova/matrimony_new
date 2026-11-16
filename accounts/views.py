@@ -26,7 +26,7 @@ from .serializers import (
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
 )
-from notifications.emailing import notify_profile_update
+from notifications.emailing import notify_profile_update, safe_email_error
 from adminpanel.models import ProfileChange, ProfileVerification
 from registrations.models import Registration
 
@@ -140,8 +140,14 @@ class PasswordResetRequestView(APIView):
                     used=False,
                 ).update(used=True)
                 logger.error(
-                    "Password reset email delivery failed (%s).",
+                    "Password reset email delivery failed: exception=%s "
+                    "smtp_code=%s detail=%s",
                     type(exc).__name__,
+                    getattr(exc, "smtp_code", None),
+                    safe_email_error(
+                        exc,
+                        (user.email, raw_token, reset_url),
+                    ),
                 )
 
         return Response(

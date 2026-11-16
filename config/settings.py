@@ -329,7 +329,12 @@ if EMAIL_USE_TLS and EMAIL_USE_SSL:
         "EMAIL_USE_TLS and EMAIL_USE_SSL cannot both be enabled."
     )
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER).strip()
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "").strip()
+if RESEND_API_KEY:
+    EMAIL_BACKEND = "anymail.backends.resend.EmailBackend"
+    ANYMAIL = {"RESEND_API_KEY": RESEND_API_KEY}
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
 OTP_EXPIRY_SECONDS = int(os.getenv("OTP_EXPIRY_SECONDS", "300"))
 OTP_RESEND_COOLDOWN_SECONDS = int(os.getenv("OTP_RESEND_COOLDOWN_SECONDS", "60"))

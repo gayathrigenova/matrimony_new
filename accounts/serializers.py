@@ -116,3 +116,11 @@ class LoginSerializer(serializers.Serializer):
         attrs["user"] = user
 
         return attrs
+
+
+class DeleteAccountSerializer(serializers.Serializer):
+    password = serializers.CharField(
+        write_only=True,
+        trim_whitespace=False,
+        allow_blank=False,
+    )

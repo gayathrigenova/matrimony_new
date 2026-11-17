@@ -1,4 +1,4 @@
-import { API_URL } from "../../api.js";
+import { API_URL, fetchWithTokenRefresh, readApiResponse } from "../../api.js";
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ClientLayout from "../../components/ClientLayout";
@@ -22,6 +22,10 @@ export default function Settings() {
   const [msgAccount, setMsgAccount] = useState({ type: "", text: "" });
   const [msgPassword, setMsgPassword] = useState({ type: "", text: "" });
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteMessage, setDeleteMessage] = useState({ type: "", text: "" });
 
   const token = localStorage.getItem("access_token");
 
@@ -101,6 +105,56 @@ export default function Settings() {
     localStorage.clear();
     window.dispatchEvent(new Event("auth-change"));
     navigate("/login");
+  };
+
+  const handleDeleteAccount = async (event) => {
+    event.preventDefault();
+    if (deletingAccount || deleteMessage.type === "success") return;
+
+    setDeletingAccount(true);
+    setDeleteMessage({ type: "", text: "" });
+    try {
+      const response = await fetchWithTokenRefresh(
+        `${API_URL}/accounts/delete-account/`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password: deletePassword }),
+        },
+      );
+      const result = await readApiResponse(response);
+      if (!response.ok) {
+        throw new Error(result.detail || "Your account could not be deleted.");
+      }
+
+      setDeleteMessage({
+        type: "success",
+        text: "Your account was deleted. Returning to the homepage…",
+      });
+      setDeletePassword("");
+      window.setTimeout(() => {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        localStorage.removeItem("user");
+        localStorage.removeItem("admin_user");
+        window.dispatchEvent(new Event("auth-change"));
+        navigate("/", { replace: true });
+      }, 1200);
+    } catch (error) {
+      setDeleteMessage({
+        type: "error",
+        text: error.message || "Your account could not be deleted.",
+      });
+    } finally {
+      setDeletingAccount(false);
+    }
+  };
+
+  const closeDeleteModal = () => {
+    if (deletingAccount || deleteMessage.type === "success") return;
+    setShowDeleteModal(false);
+    setDeletePassword("");
+    setDeleteMessage({ type: "", text: "" });
   };
 
   return (
@@ -218,6 +272,85 @@ export default function Settings() {
             </button>
           </div>
         </div>
+
+        <section className="settings-card settings-danger-zone">
+          <div className="danger-zone-copy">
+            <h3 className="settings-card-title">Danger Zone</h3>
+            <p>
+              Permanently remove your login account, profile, uploaded photos
+              and documents, and other account-linked records.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn-delete-account"
+            onClick={() => {
+              setDeleteMessage({ type: "", text: "" });
+              setShowDeleteModal(true);
+            }}
+          >
+            Delete Account
+          </button>
+        </section>
+
+        {showDeleteModal && (
+          <div className="modal-overlay">
+            <section
+              className="modal-content settings-delete-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="delete-account-title"
+            >
+              <h3 id="delete-account-title">Permanently delete your account?</h3>
+              <p>
+                This action cannot be undone. Your profile and login account,
+                along with account-owned photos and documents, will be deleted.
+                You will need to register again to use this service.
+              </p>
+              {deleteMessage.text && (
+                <p
+                  className={`delete-account-message ${deleteMessage.type}`}
+                  role={deleteMessage.type === "error" ? "alert" : "status"}
+                >
+                  {deleteMessage.text}
+                </p>
+              )}
+              {deleteMessage.type !== "success" && (
+                <form onSubmit={handleDeleteAccount}>
+                  <label htmlFor="delete-account-password">
+                    Confirm with your current password
+                  </label>
+                  <input
+                    id="delete-account-password"
+                    type="password"
+                    autoComplete="current-password"
+                    value={deletePassword}
+                    onChange={(event) => setDeletePassword(event.target.value)}
+                    required
+                    disabled={deletingAccount}
+                  />
+                  <div className="modal-actions">
+                    <button
+                      type="button"
+                      className="btn-cancel"
+                      onClick={closeDeleteModal}
+                      disabled={deletingAccount}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn-delete-account"
+                      disabled={deletingAccount || !deletePassword}
+                    >
+                      {deletingAccount ? "Deleting…" : "Delete my account"}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </section>
+          </div>
+        )}
 
         {/* LOGOUT CONFIRMATION MODAL */}
         {showLogoutModal && (

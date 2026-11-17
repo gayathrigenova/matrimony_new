@@ -15,7 +15,12 @@ from .models import User
 from .password_reset import PasswordResetToken
 from django.core import mail
 from adminpanel.models import ProfileChange, ProfileVerification
-from registrations.models import Registration
+from memberships.models import ContactCreditBalance, RazorpayOrder
+from registrations.models import (
+    ClientPhoto,
+    Registration,
+    VerificationChallenge,
+)
 
 
 class TokenRefreshTests(TestCase):
@@ -57,6 +62,195 @@ class TokenRefreshTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 401)
+
+
+class AccountDeletionTests(TestCase):
+    def create_registration(self, user, phone, **extra_fields):
+        return Registration.objects.create(
+            user=user,
+            full_name="Account Holder",
+            gender="Female",
+            date_of_birth=date(1995, 1, 1),
+            phone=phone,
+            **extra_fields,
+        )
+
+    def test_account_deletion_requires_authentication_and_password(self):
+        user = User.objects.create_user(
+            email="delete-check@example.com",
+            password="current-password",
+        )
+        endpoint = "/api/accounts/delete-account/"
+
+        unauthenticated = APIClient().post(
+            endpoint,
+            {"password": "current-password"},
+            format="json",
+        )
+        self.assertEqual(unauthenticated.status_code, 401)
+
+        client = APIClient()
+        client.force_authenticate(user)
+        incorrect_password = client.post(
+            endpoint,
+            {"password": "wrong-password"},
+            format="json",
+        )
+
+        self.assertEqual(incorrect_password.status_code, 400)
+        self.assertTrue(User.objects.filter(pk=user.pk).exists())
+
+        admin = User.objects.create_user(
+            email="delete-admin@example.com",
+            password="admin-password",
+            role=User.Role.ADMIN,
+        )
+        client.force_authenticate(admin)
+        forbidden = client.post(
+            endpoint,
+            {"password": "admin-password"},
+            format="json",
+        )
+
+        self.assertEqual(forbidden.status_code, 403)
+        self.assertTrue(User.objects.filter(pk=admin.pk).exists())
+        self.assertTrue(User.objects.filter(pk=user.pk).exists())
+
+    def test_client_deletion_cascades_owned_data_and_preserves_shared_files(self):
+        user = User.objects.create_user(
+            email="delete-owner@example.com",
+            password="current-password",
+            full_name="Account Holder",
+        )
+        registration = self.create_registration(
+            user,
+            "9000000001",
+            profile_photo="profiles/shared.jpg",
+            identity_document="documents/identity/unique.pdf",
+        )
+        photo = ClientPhoto.objects.create(
+            registration=registration,
+            photo="profiles/shared.jpg",
+            pending_photo="profiles/pending.jpg",
+        )
+        ProfileChange.objects.create(
+            registration=registration,
+            user=user,
+            pending_identity_document="documents/pending_changes/pending.pdf",
+        )
+        ProfileVerification.objects.create(client=user)
+        ContactCreditBalance.objects.create(
+            user=user,
+            remaining_contacts=4,
+            total_contacts_purchased=4,
+        )
+        RazorpayOrder.objects.create(
+            user=user,
+            provider_order_id="order_delete_owner",
+            amount=1000,
+        )
+        now = timezone.now()
+        VerificationChallenge.objects.create(
+            email=user.email,
+            phone=registration.phone,
+            email_otp_hash="unused-hash",
+            phone_otp_hash="unused-hash",
+            email_resend_after=now,
+            phone_resend_after=now,
+            email_expires_at=now + timedelta(minutes=5),
+            phone_expires_at=now + timedelta(minutes=5),
+            expires_at=now + timedelta(minutes=5),
+        )
+        PasswordResetToken.generate_for_user(user)
+
+        other_user = User.objects.create_user(
+            email="unrelated@example.com",
+            password="other-password",
+        )
+        other_registration = self.create_registration(
+            other_user,
+            "9000000002",
+            profile_photo="profiles/shared.jpg",
+        )
+        other_balance = ContactCreditBalance.objects.create(
+            user=other_user,
+            remaining_contacts=2,
+            total_contacts_purchased=2,
+        )
+        other_order = RazorpayOrder.objects.create(
+            user=other_user,
+            provider_order_id="order_unrelated",
+            amount=1000,
+        )
+
+        access_token = str(RefreshToken.for_user(user).access_token)
+        client = APIClient()
+        client.force_authenticate(user)
+        storage = Registration._meta.get_field("profile_photo").storage
+        with patch.object(storage, "delete") as delete_file:
+            with self.captureOnCommitCallbacks(execute=True):
+                response = client.post(
+                    "/api/accounts/delete-account/",
+                    {
+                        "password": "current-password",
+                        "user_id": other_user.pk,
+                    },
+                    format="json",
+                )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertFalse(User.objects.filter(pk=user.pk).exists())
+        self.assertFalse(Registration.objects.filter(pk=registration.pk).exists())
+        self.assertFalse(ClientPhoto.objects.filter(pk=photo.pk).exists())
+        self.assertFalse(ProfileChange.objects.filter(user=user).exists())
+        self.assertFalse(ProfileVerification.objects.filter(client=user).exists())
+        self.assertFalse(ContactCreditBalance.objects.filter(user=user).exists())
+        self.assertFalse(RazorpayOrder.objects.filter(user=user).exists())
+        self.assertFalse(PasswordResetToken.objects.filter(user_id=user.pk).exists())
+        self.assertFalse(
+            VerificationChallenge.objects.filter(email__iexact=user.email).exists()
+        )
+        self.assertTrue(User.objects.filter(pk=other_user.pk).exists())
+        self.assertTrue(Registration.objects.filter(pk=other_registration.pk).exists())
+        self.assertTrue(ContactCreditBalance.objects.filter(pk=other_balance.pk).exists())
+        self.assertTrue(RazorpayOrder.objects.filter(pk=other_order.pk).exists())
+
+        deleted_file_names = {
+            call.args[0]
+            for call in delete_file.call_args_list
+        }
+        self.assertNotIn("profiles/shared.jpg", deleted_file_names)
+        self.assertIn("documents/identity/unique.pdf", deleted_file_names)
+        self.assertIn("profiles/pending.jpg", deleted_file_names)
+        self.assertIn(
+            "documents/pending_changes/pending.pdf",
+            deleted_file_names,
+        )
+
+        old_login_response = APIClient().post(
+            "/api/accounts/login/",
+            {
+                "username": "delete-owner@example.com",
+                "password": "current-password",
+            },
+            format="json",
+        )
+        self.assertEqual(old_login_response.status_code, 400)
+
+        replacement = User.objects.create_user(
+            email="delete-owner@example.com",
+            password="new-password",
+        )
+        self.assertTrue(User.objects.filter(pk=replacement.pk).exists())
+
+        client.force_authenticate(None)
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {access_token}")
+        old_token_response = client.post(
+            "/api/accounts/delete-account/",
+            {"password": "current-password"},
+            format="json",
+        )
+        self.assertEqual(old_token_response.status_code, 401)
 
 
 @override_settings(

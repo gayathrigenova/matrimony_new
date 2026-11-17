@@ -392,7 +392,7 @@ class RegistrationDuplicateValidationTests(TestCase):
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
         DEFAULT_FROM_EMAIL="no-reply@example.com",
     )
-    @patch("registrations.views.send_mobile_otp")
+    @patch("registrations.views.send_mobile_otp", return_value="sent")
     def test_channel_start_verifies_only_the_selected_contact(self, send_sms):
         email_start = self.client.post(
             "/api/registrations/verification/start/",
@@ -456,7 +456,7 @@ class RegistrationDuplicateValidationTests(TestCase):
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
         DEFAULT_FROM_EMAIL="no-reply@example.com",
     )
-    @patch("registrations.views.send_mobile_otp")
+    @patch("registrations.views.send_mobile_otp", return_value="sent")
     def test_channel_verifications_share_a_bound_registration_challenge(self, send_sms):
         email_start = self.client.post(
             "/api/registrations/verification/start/",

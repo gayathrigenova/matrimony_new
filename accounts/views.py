@@ -8,7 +8,8 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ImproperlyConfigured
 from django.core.mail import EmailMultiAlternatives
-from django.db import transaction
+from django.db import models, transaction
+from django.db.models import Q
 from django.template.loader import render_to_string
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
@@ -22,13 +23,14 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from .password_reset import PasswordResetToken
 from .serializers import (
+    DeleteAccountSerializer,
     LoginSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
 )
 from notifications.emailing import notify_profile_update, safe_email_error
 from adminpanel.models import ProfileChange, ProfileVerification
-from registrations.models import Registration
+from registrations.models import ClientPhoto, Registration, VerificationChallenge
 
 
 logger = logging.getLogger(__name__)
@@ -37,6 +39,50 @@ PASSWORD_RESET_MESSAGE = (
     "If an account exists with this email, a password reset link has been sent."
 )
 INVALID_RESET_LINK_MESSAGE = "This password reset link is invalid or has expired."
+
+
+def _account_file_querysets(user_id=None):
+    if user_id is None:
+        return [
+            (Registration, Registration.objects.all()),
+            (ClientPhoto, ClientPhoto.objects.all()),
+            (ProfileChange, ProfileChange.objects.all()),
+        ]
+
+    return [
+        (Registration, Registration.objects.filter(user_id=user_id)),
+        (ClientPhoto, ClientPhoto.objects.filter(registration__user_id=user_id)),
+        (
+            ProfileChange,
+            ProfileChange.objects.filter(
+                Q(user_id=user_id) | Q(registration__user_id=user_id)
+            ).distinct(),
+        ),
+    ]
+
+
+def _file_references(querysets):
+    references = {}
+    for model, queryset in querysets:
+        for field in model._meta.get_fields():
+            if not isinstance(field, models.FileField):
+                continue
+            file_names = (
+                queryset
+                .filter(**{f"{field.name}__isnull": False})
+                .exclude(**{field.name: ""})
+                .values_list(field.name, flat=True)
+            )
+            for name in file_names:
+                references[(id(field.storage), name)] = (field.storage, name)
+    return references
+
+
+def _delete_unreferenced_account_files(stored_files):
+    remaining_files = _file_references(_account_file_querysets())
+    for key, (storage, name) in stored_files.items():
+        if key not in remaining_files:
+            storage.delete(name)
 
 
 class LoginView(APIView):
@@ -359,4 +405,62 @@ class UpdateAccountView(APIView):
                 }
             },
             status=status.HTTP_200_OK
+        )
+
+
+class DeleteAccountView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if request.user.role != User.Role.CLIENT:
+            return Response(
+                {"detail": "Only client accounts can be deleted."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = DeleteAccountSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            user = User.objects.select_for_update().filter(
+                pk=request.user.pk,
+            ).first()
+            if user is None:
+                return Response(
+                    {"detail": "The account is no longer available."},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+            if user.role != User.Role.CLIENT:
+                return Response(
+                    {"detail": "Only client accounts can be deleted."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            if not user.check_password(serializer.validated_data["password"]):
+                return Response(
+                    {"detail": "The password confirmation is incorrect."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            stored_files = _file_references(
+                _account_file_querysets(user.pk)
+            )
+            VerificationChallenge.objects.filter(
+                email__iexact=user.email,
+            ).delete()
+            user.delete()
+
+            if stored_files:
+                transaction.on_commit(
+                    lambda files=stored_files: _delete_unreferenced_account_files(
+                        files
+                    )
+                )
+
+        return Response(
+            {"detail": "Your account has been permanently deleted."},
+            status=status.HTTP_200_OK,
         )

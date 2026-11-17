@@ -202,7 +202,7 @@ export default function Registration() {
 
       setVerification(createVerificationState(result, Date.now()));
       setVerificationToken(result.verification_token || "");
-      setOtpValues({ email: "", mobile: "" });
+      setOtpValues((current) => ({ ...current, [channel]: "" }));
 
       const deliveryNotes = [];
       const delivery = result[`${channel}_delivery`];

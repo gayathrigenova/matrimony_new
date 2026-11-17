@@ -14,15 +14,15 @@ applies migrations and starts Gunicorn. Set:
 - `CSRF_TRUSTED_ORIGINS`: comma separated origins including `https://`.
 - `MYSQLHOST`, `MYSQLPORT`, `MYSQLDATABASE`, `MYSQLUSER`, `MYSQLPASSWORD`:
   Railway MySQL connection values.
-- `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`, `EMAIL_USE_SSL`,
-  `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL`: Gmail SMTP
-  settings. Use `smtp.gmail.com`, port `587`, `EMAIL_USE_TLS=true`, and
-  `EMAIL_USE_SSL=false`; set `EMAIL_HOST_USER` and `DEFAULT_FROM_EMAIL` to the
-  same full Gmail address, and use a Google App Password for
-  `EMAIL_HOST_PASSWORD`. The Django SMTP backend is configured by the app and
-  is not selected through a Railway variable. `EMAIL_TIMEOUT` sets the SMTP
-  connection timeout in seconds (default `10`). Keep credentials only in
-  Railway variables.
+- `RESEND_API_KEY` and `DEFAULT_FROM_EMAIL`: use these for the configured
+  django-anymail Resend backend. `DEFAULT_FROM_EMAIL` must be a sender/domain
+  verified in Resend. If `RESEND_API_KEY` is absent, the app uses Django's SMTP
+  backend; configure `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`,
+  `EMAIL_USE_SSL`, `EMAIL_HOST_USER`, and `EMAIL_HOST_PASSWORD`. For Gmail, use
+  `smtp.gmail.com`, port `587`, `EMAIL_USE_TLS=true`,
+  `EMAIL_USE_SSL=false`, the full sender address, and a Google App Password.
+  `EMAIL_TIMEOUT` sets the SMTP connection timeout (default `10`). Keep
+  credentials only in Railway variables.
 - `ADMIN_NOTIFICATION_EMAIL`: destination for profile review notices.
 - `ADMIN_DASHBOARD_URL`: frontend origin used for admin review links.
 - `FRONTEND_URL`: frontend origin used in client emails and password-reset
@@ -35,10 +35,17 @@ applies migrations and starts Gunicorn. Set:
 - `OTP_EXPIRY_SECONDS` (default `300`), `OTP_RESEND_COOLDOWN_SECONDS`
   (default `60`), and `OTP_MAX_ATTEMPTS` (default `5`): positive integer OTP
   policy values.
-- `MOBILE_OTP_MODE=console` enables backend-only mobile OTP generation for a
-  non-production test service. Codes are written to Django/Railway application
-  logs; this mode does not send SMS. Leave it unset or use `disabled` in
-  production. No SMS provider is integrated in this project.
+- SMS delivery must use a real provider. For Twilio, set
+  `SMS_PROVIDER=twilio`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and
+  `TWILIO_FROM_NUMBER`. For a compatible HTTP SMS API, set `SMS_PROVIDER=http`,
+  `SMS_API_URL`, and `SMS_API_KEY`; `SMS_API_KEY_HEADER` (default
+  `Authorization`), `SMS_API_KEY_PREFIX` (default `Bearer`), `SMS_SENDER_ID`,
+  and `SMS_TIMEOUT` are optional provider settings. `SMS_DEFAULT_COUNTRY_CODE`
+  defaults to `+91`. If the selected provider's required credentials are
+  missing, verification returns a delivery error naming the required variables
+  and registration remains blocked. `SMS_PROVIDER=disabled` does not send SMS.
+  `MOBILE_OTP_MODE=console` is development-only, writes a code to backend logs,
+  and is not SMS delivery.
 
 Keep `DEBUG` false in production. This repository is deployed from its root:
 Railway builds and starts `manage.py` and `config.wsgi` from that service root.
@@ -138,39 +145,38 @@ commits. Configure SMTP and `ADMIN_NOTIFICATION_EMAIL` so these notifications
 reach their recipients; delivery failures are logged without undoing a saved
 registration or profile update.
 
-Mobile verification's console mode does not send SMS. For local testing in
-PowerShell, enable console mode and start Django:
+Mobile verification's console mode does not send SMS. It is for local testing
+only; production must use a real SMS provider. To enable the development-only
+mode in PowerShell, start Django with:
 
 ```powershell
 $env:MOBILE_OTP_MODE = "console"
 python manage.py runserver
 ```
 
-The generated mobile OTP is logged to the Django development console, while
-only its hash is stored and the API never returns the code. OTPs expire after
-five minutes by default. A Railway test service can use `DEBUG=false` with
-`MOBILE_OTP_MODE=console` to write codes to Railway deployment logs. Enable this
-only on a non-production service; leave the mode `disabled` in production.
+The development code is logged to the Django console, while only its hash is
+stored and the API never returns the code. This mode is not evidence of SMS
+delivery and should not be used on a production service. OTPs expire after five
+minutes by default.
 
-Email settings are read from Railway environment variables. The application
-defaults to Gmail host `smtp.gmail.com`, port `587`, TLS enabled, SSL disabled,
-and Django's SMTP backend. For production, set `EMAIL_HOST`,
-`EMAIL_PORT=587`, `EMAIL_USE_TLS=true`, `EMAIL_USE_SSL=false`,
-`EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, and `DEFAULT_FROM_EMAIL`; use a
-Google App Password (not the normal account password) and set the sender to
-the same verified Gmail address. Check the backend application logs for a
-credential-redacted SMTP exception, status code, and server diagnostic when
-delivery fails. The application does not log SMTP credentials or return them
-in API errors.
+Set `RESEND_API_KEY` to select django-anymail's Resend backend, and configure
+`DEFAULT_FROM_EMAIL` as a sender/domain verified in Resend. Otherwise, the
+application defaults to Gmail SMTP (`smtp.gmail.com`, port `587`, TLS enabled,
+SSL disabled). For Gmail, set `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` to a
+Google App Password, and `DEFAULT_FROM_EMAIL` to the verified sender. Delivery
+failures are logged with redacted provider diagnostics; credentials and OTP
+values are not returned to the frontend.
 
-The registration flow first requests email and mobile codes, verifies each
+The first registration form requests email and mobile codes, verifies each
 code, then passes the one-time verification token through the existing
 registration steps. OTP hashes are stored in the database; the codes are never
-included in API responses. Deploy the `registrations.0011_verificationchallenge`
-migration together with the backend code, then rebuild/redeploy the frontend.
+included in API responses. The registration API checks that the token is
+unexpired, unused, verified on both channels, and bound to the submitted email
+and phone before creating the account. Deploy the existing
+`registrations.0011_verificationchallenge` migration together with the backend
+code, then rebuild/redeploy the frontend.
 The resend endpoint is `/api/registrations/verification/resend/`; it enforces
 the configured per-channel cooldown even when a provider delivery fails, and
 only replaces the stored OTP after its delivery path completes successfully.
-Before production, test email OTP delivery with the Railway SMTP variables
-configured. Mobile verification stays disabled until an SMS provider is
-deliberately integrated.
+Before production, test email OTP delivery with the Resend or SMTP variables
+configured and test mobile OTP delivery with the selected real SMS provider.

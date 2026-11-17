@@ -12,6 +12,7 @@ from .models import (
     ClientPhoto,
     Conversation,
     Message,
+    VerificationChallenge,
 )
 from notifications.emailing import (
     notify_admin_new_registration,
@@ -66,6 +67,8 @@ class RegistrationSerializer(serializers.ModelSerializer):
         write_only=True,
         min_length=6
     )
+
+    verification_token = serializers.UUIDField(write_only=True)
 
 
     class Meta:
@@ -134,6 +137,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
             "updated_at",
             "email",
             "password",
+            "verification_token",
         ]
 
         read_only_fields = [
@@ -188,8 +192,34 @@ class RegistrationSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         email = validated_data.pop("email").strip().lower()
         password = validated_data.pop("password")
+        verification_token = validated_data.pop("verification_token")
         try:
             with transaction.atomic():
+                try:
+                    challenge = VerificationChallenge.objects.select_for_update().get(
+                        pk=verification_token
+                    )
+                except VerificationChallenge.DoesNotExist:
+                    raise serializers.ValidationError(
+                        {"verification_token": "The verification request was not found."}
+                    ) from None
+
+                now = timezone.now()
+                if (
+                    challenge.consumed_at
+                    or challenge.expires_at <= now
+                    or not challenge.email_verified
+                    or not challenge.phone_verified
+                    or challenge.email.lower() != email
+                    or challenge.phone != validated_data.get("phone")
+                ):
+                    raise serializers.ValidationError({
+                        "verification_token": (
+                            "Verify the submitted email and mobile number before "
+                            "completing registration."
+                        )
+                    })
+
                 user = User.objects.create_user(
                     email=email,
                     password=password,
@@ -197,6 +227,8 @@ class RegistrationSerializer(serializers.ModelSerializer):
                     role=User.Role.CLIENT,
                 )
                 registration = Registration.objects.create(user=user, **validated_data)
+                challenge.consumed_at = now
+                challenge.save(update_fields=["consumed_at"])
                 transaction.on_commit(
                     lambda registration=registration: (
                         notify_registration_completed(registration),

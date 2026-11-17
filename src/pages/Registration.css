@@ -474,6 +474,68 @@
   color: #294d83;
 }
 
+.registration-contact-field {
+  min-width: 0;
+}
+
+.registration-contact-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.registration-verify-contact-btn {
+  min-height: 42px;
+  padding: 0 0.9rem;
+  border: 0;
+  border-radius: 7px;
+  background: #087c47;
+  color: #fff;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.registration-verify-contact-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.registration-channel-status {
+  margin: 0.4rem 0 0;
+  color: #a32121;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.registration-channel-status.verified {
+  color: #087c47;
+}
+
+.registration-channel-otp {
+  margin-top: 0.75rem;
+}
+
+.registration-channel-otp > label {
+  margin-bottom: 0.4rem;
+}
+
+.registration-channel-otp .registration-contact-control {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.registration-resend-message.info {
+  color: #294d83;
+}
+
+.registration-new-codes-btn {
+  display: block;
+  margin: 0 auto;
+}
+
 
 /* =====================================================
    RESPONSIVE
@@ -507,6 +569,11 @@
 
   .registration-otp-row {
     grid-template-columns: 1fr;
+  }
+
+  .registration-contact-control,
+  .registration-channel-otp .registration-contact-control {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .registration-dob {

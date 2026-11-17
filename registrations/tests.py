@@ -20,7 +20,7 @@ from adminpanel.models import ProfileChange
 
 from .models import Registration, VerificationChallenge
 from .serializers import RegistrationSerializer
-from .verification import VerificationDeliveryError
+from .verification import VerificationDeliveryError, send_email_otp
 
 
 User = get_user_model()
@@ -485,6 +485,79 @@ class RegistrationDuplicateValidationTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("verification_token", response.data)
         self.assertFalse(User.objects.filter(email="unverified@example.com").exists())
+
+    def test_registration_rejects_unverified_challenge_token(self):
+        now = timezone.now()
+        challenge = VerificationChallenge.objects.create(
+            email="pending@example.com",
+            phone="9123456780",
+            email_otp_hash="not-used",
+            phone_otp_hash="not-used",
+            email_resend_after=now,
+            phone_resend_after=now,
+            email_expires_at=now + timedelta(minutes=5),
+            phone_expires_at=now + timedelta(minutes=5),
+            expires_at=now + timedelta(minutes=5),
+        )
+
+        response = self.client.post(
+            "/api/registrations/",
+            {
+                "full_name": "Unverified User",
+                "gender": "Male",
+                "date_of_birth": "1994-01-01",
+                "email": "pending@example.com",
+                "password": "pass123",
+                "phone": "9123456780",
+                "verification_token": str(challenge.pk),
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("verification_token", response.data)
+        self.assertFalse(User.objects.filter(email="pending@example.com").exists())
+
+    def test_registration_verification_token_is_bound_to_both_contacts(self):
+        now = timezone.now()
+        challenge = VerificationChallenge.objects.create(
+            email="verified@example.com",
+            phone="9123456780",
+            email_otp_hash="not-used",
+            phone_otp_hash="not-used",
+            email_verified=True,
+            phone_verified=True,
+            email_resend_after=now,
+            phone_resend_after=now,
+            email_expires_at=now + timedelta(minutes=5),
+            phone_expires_at=now + timedelta(minutes=5),
+            expires_at=now + timedelta(minutes=5),
+        )
+
+        for email, phone in (
+            ("different@example.com", "9123456780"),
+            ("verified@example.com", "9123456781"),
+        ):
+            response = self.client.post(
+                "/api/registrations/",
+                {
+                    "full_name": "Mismatched User",
+                    "gender": "Male",
+                    "date_of_birth": "1994-01-01",
+                    "email": email,
+                    "password": "pass123",
+                    "phone": phone,
+                    "verification_token": str(challenge.pk),
+                },
+                format="json",
+            )
+            self.assertEqual(response.status_code, 400)
+            self.assertIn("verification_token", response.data)
+
+        self.assertFalse(User.objects.filter(email="different@example.com").exists())
+        self.assertFalse(User.objects.filter(email="verified@example.com").exists())
+        challenge.refresh_from_db()
+        self.assertIsNone(challenge.consumed_at)
 
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
@@ -1077,6 +1150,32 @@ class RegistrationDuplicateValidationTests(TestCase):
         self.assertIn("EMAIL_HOST", email_error["detail"])
         self.assertIn("EMAIL_HOST_PASSWORD", email_error["detail"])
         self.assertNotIn("failed_channels", response.data)
+
+    @override_settings(
+        IS_RAILWAY=True,
+        EMAIL_BACKEND="anymail.backends.resend.EmailBackend",
+        RESEND_API_KEY="re_test_key",
+        DEFAULT_FROM_EMAIL="verified@example.com",
+    )
+    @patch("registrations.verification.send_mail", return_value=1)
+    def test_resend_email_backend_is_allowed_on_railway(self, send_mail_mock):
+        delivery = send_email_otp("recipient@example.com", "123456")
+
+        self.assertEqual(delivery, "sent")
+        send_mail_mock.assert_called_once()
+
+    @override_settings(
+        IS_RAILWAY=True,
+        EMAIL_BACKEND="anymail.backends.resend.EmailBackend",
+        RESEND_API_KEY="",
+        DEFAULT_FROM_EMAIL="",
+    )
+    def test_resend_reports_missing_api_key_and_sender(self):
+        with self.assertRaises(VerificationDeliveryError) as error:
+            send_email_otp("recipient@example.com", "123456")
+
+        self.assertIn("RESEND_API_KEY", str(error.exception))
+        self.assertIn("DEFAULT_FROM_EMAIL", str(error.exception))
 
     @override_settings(
         DEBUG=False,

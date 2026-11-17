@@ -7,6 +7,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from anymail.exceptions import AnymailError
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.mail import send_mail
@@ -21,15 +22,13 @@ class VerificationDeliveryError(Exception):
 
 
 def send_email_otp(email, otp):
-    if settings.IS_RAILWAY and not settings.EMAIL_BACKEND.endswith(
-        "smtp.EmailBackend"
-    ):
-        raise VerificationDeliveryError(
-            "Railway email verification requires Django's SMTP email backend."
-        )
-
     missing_settings = []
-    if settings.EMAIL_BACKEND.endswith("smtp.EmailBackend"):
+    if settings.EMAIL_BACKEND.endswith("resend.EmailBackend"):
+        if not settings.RESEND_API_KEY:
+            missing_settings.append("RESEND_API_KEY")
+        if not settings.DEFAULT_FROM_EMAIL.strip():
+            missing_settings.append("DEFAULT_FROM_EMAIL")
+    elif settings.EMAIL_BACKEND.endswith("smtp.EmailBackend"):
         missing_settings = [
             name
             for name, value in (
@@ -42,6 +41,8 @@ def send_email_otp(email, otp):
         ]
         if settings.DEFAULT_FROM_EMAIL.lower().endswith("@localhost"):
             missing_settings.append("DEFAULT_FROM_EMAIL (use the verified website sender)")
+    elif not settings.DEFAULT_FROM_EMAIL.strip():
+        missing_settings.append("DEFAULT_FROM_EMAIL")
     if missing_settings:
         raise VerificationDeliveryError(
             "Email delivery is not configured. Set these Railway variables: "
@@ -64,6 +65,7 @@ def send_email_otp(email, otp):
     except (
         OSError,
         smtplib.SMTPException,
+        AnymailError,
         ImproperlyConfigured,
         ValueError,
     ) as exc:

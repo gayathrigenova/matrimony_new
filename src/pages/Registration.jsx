@@ -4,15 +4,12 @@ import { API_URL, readApiResponse } from "../api.js";
 import { BIRTH_STAR_OPTIONS, CASTE_OPTIONS } from "../constants.js";
 import "./Registration.css";
 
-const PENDING_VERIFICATION_KEY = "matrimony.pendingRegistrationVerification";
-
 export default function Registration() {
   const navigate = useNavigate();
   const location = useLocation();
 
   const prefill = location.state || {};
   const previousFormData = prefill.step1FormData || {};
-  const [savedVerification] = useState(readPendingVerification);
 
   const [formData, setFormData] = useState({
     name: previousFormData.name || prefill.name || prefill.registration?.full_name || "",
@@ -29,6 +26,7 @@ export default function Registration() {
   });
   const [fieldErrors, setFieldErrors] = useState({});
   const [checkingEmail, setCheckingEmail] = useState(false);
+  const [startingVerification, setStartingVerification] = useState(false);
   const [verification, setVerification] = useState(null);
   const [verificationToken, setVerificationToken] = useState(
     prefill.registration?.verification_token || "",
@@ -49,6 +47,7 @@ export default function Registration() {
 
   useEffect(() => {
     if (!verification?.challengeId) return undefined;
+    setCurrentTime(Date.now());
     const timer = window.setInterval(() => setCurrentTime(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, [verification?.challengeId]);
@@ -66,9 +65,9 @@ export default function Registration() {
     setFieldErrors((prev) => ({ ...prev, [name]: "" }));
     if (
       (name === "email" || name === "phone")
-      && (verification || verificationToken || savedVerification)
+      && value !== formData[name]
+      && (verification || verificationToken)
     ) {
-      sessionStorage.removeItem(PENDING_VERIFICATION_KEY);
       setVerification(null);
       setVerificationToken("");
       setOtpValues({ email: "", mobile: "" });
@@ -102,9 +101,9 @@ export default function Registration() {
       email: formData.email.trim().toLowerCase(),
       password: formData.password,
       phone: formData.phone.trim(),
+      verification_token: token,
     };
 
-    sessionStorage.removeItem(PENDING_VERIFICATION_KEY);
     navigate("/registration-details", {
       state: {
         registration: registrationData,
@@ -123,6 +122,17 @@ export default function Registration() {
     }
     if (formData.password !== formData.confirmPassword) {
       setFieldErrors((prev) => ({ ...prev, confirmPassword: "Passwords do not match." }));
+      return;
+    }
+    if (
+      !verification?.emailVerified
+      || !verification?.mobileVerified
+      || !verificationToken
+    ) {
+      setVerificationMessage({
+        type: "error",
+        text: "Verify both your email address and mobile number before continuing.",
+      });
       return;
     }
 
@@ -148,7 +158,7 @@ export default function Registration() {
         throw new Error(availability.detail || "Could not check these contact details.");
       }
 
-      continueRegistration("");
+      continueRegistration(verificationToken);
     } catch (error) {
       setVerificationMessage({
         type: "error",
@@ -156,6 +166,60 @@ export default function Registration() {
       });
     } finally {
       setCheckingEmail(false);
+    }
+  };
+
+  const handleStartVerification = async () => {
+    if (startingVerification) return;
+    setStartingVerification(true);
+    setFieldErrors((prev) => ({ ...prev, email: "", phone: "" }));
+    setVerificationMessage({ type: "", text: "" });
+    try {
+      const response = await fetch(`${API_URL}/registrations/verification/start/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: formData.email.trim().toLowerCase(),
+          phone: formData.phone.trim(),
+        }),
+      });
+      const result = await readApiResponse(response);
+      if (!response.ok) {
+        const deliveryErrors = result.delivery_errors
+          ?.map((item) => item.detail)
+          .filter(Boolean)
+          .join(" ");
+        throw new Error(deliveryErrors || result.detail || "Could not send verification codes.");
+      }
+
+      setVerification(createVerificationState(result, Date.now()));
+      setVerificationToken(result.verification_token || "");
+      setOtpValues({ email: "", mobile: "" });
+
+      const deliveryNotes = [];
+      if (result.email_delivery === "sent") {
+        deliveryNotes.push("Email OTP sent.");
+      } else if (result.email_delivery === "console") {
+        deliveryNotes.push("Development mode: the email code is in the backend console; no email was sent.");
+      }
+      if (result.mobile_delivery === "sent") {
+        deliveryNotes.push("Mobile OTP sent by SMS.");
+      } else if (result.mobile_delivery === "development_console") {
+        deliveryNotes.push("Development mode: no SMS was sent; the mobile code is in the backend console.");
+      }
+      setVerificationMessage({
+        type: result.email_delivery === "sent" && result.mobile_delivery === "sent"
+          ? "success"
+          : "info",
+        text: deliveryNotes.join(" "),
+      });
+    } catch (error) {
+      setVerificationMessage({
+        type: "error",
+        text: error.message || "Could not send verification codes. Please try again.",
+      });
+    } finally {
+      setStartingVerification(false);
     }
   };
 
@@ -181,13 +245,12 @@ export default function Registration() {
         emailVerified: result.email_verified,
         mobileVerified: result.mobile_verified,
       }));
+      setVerificationToken(result.verification_token || "");
       if (result.verification_token) {
-        setVerificationToken(result.verification_token);
         setVerificationMessage({
           type: "success",
-          text: "Email and mobile number verified. Continuing registration...",
+          text: "Email and mobile number verified. You can continue to the next step.",
         });
-        continueRegistration(result.verification_token);
       } else {
         setVerificationMessage({
           type: "success",
@@ -255,7 +318,9 @@ export default function Registration() {
       setResendMessages((current) => ({
         ...current,
         [channel]: {
-          type: "success",
+          type: result.delivery === "development_console" || result.delivery === "console"
+            ? "info"
+            : "success",
           text: result.message || "The code was generated, but delivery status is unavailable.",
         },
       }));
@@ -287,6 +352,7 @@ export default function Registration() {
   const mobileExpired = verification
     ? channelExpiryRemaining("mobile") === 0
     : false;
+  const allCodesExpired = emailExpired && mobileExpired;
   return (
     <div className="registration-page-wrapper">
 
@@ -525,35 +591,164 @@ export default function Registration() {
 
             {/* EMAIL */}
             <div className="registration-form-group">
-              <label>Phone Number *</label>
-              <input
-                type="tel"
-                name="phone"
-                placeholder="Enter Mobile Number"
-                value={formData.phone}
-                onChange={handleChange}
-                disabled={checkingEmail && Boolean(savedVerification?.challengeId)}
-                required
-              />
+              <label htmlFor="registration-phone">Phone Number *</label>
+              <div className="registration-contact-field">
+                <div className="registration-contact-control">
+                  <input
+                    id="registration-phone"
+                    type="tel"
+                    name="phone"
+                    placeholder="Enter Mobile Number"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="registration-verify-contact-btn"
+                    onClick={handleStartVerification}
+                    disabled={startingVerification || Boolean(verification?.challengeId)}
+                  >
+                    {startingVerification ? "Sending..." : "Verify Mobile"}
+                  </button>
+                </div>
               {fieldErrors.phone && <small className="registration-field-error" role="alert">{fieldErrors.phone}</small>}
+                <p className={`registration-channel-status ${verification?.mobileVerified ? "verified" : ""}`}>
+                  Mobile: {verification?.mobileVerified ? "Verified" : "Not Verified"}
+                </p>
+                {verification?.challengeId && !verification.mobileVerified && (
+                  <div className="registration-channel-otp">
+                    <label htmlFor="registration-mobile-otp">Mobile OTP</label>
+                    <div className="registration-contact-control">
+                      <input
+                        id="registration-mobile-otp"
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        maxLength={6}
+                        placeholder="Enter 6-digit mobile OTP"
+                        value={otpValues.mobile}
+                        onChange={(event) => setOtpValues((current) => ({
+                          ...current,
+                          mobile: event.target.value.replace(/\D/g, "").slice(0, 6),
+                        }))}
+                        disabled={mobileExpired}
+                      />
+                      <button
+                        type="button"
+                        className="registration-verify-contact-btn"
+                        onClick={() => handleVerify("mobile")}
+                        disabled={verifying.mobile || mobileExpired}
+                      >
+                        {verifying.mobile ? "Verifying..." : "Verify OTP"}
+                      </button>
+                      <button
+                        type="button"
+                        className="registration-resend-btn"
+                        onClick={() => handleResend("mobile")}
+                        disabled={
+                          resending.mobile
+                          || verification.resendAfter.mobile > currentTime
+                        }
+                      >
+                        {resending.mobile
+                          ? "Sending..."
+                          : verification.resendAfter.mobile > currentTime
+                            ? `Resend in ${formatCountdown(Math.ceil((verification.resendAfter.mobile - currentTime) / 1000))}`
+                            : "Resend OTP"}
+                      </button>
+                    </div>
+                    {mobileExpired && <small className="registration-field-error">This code has expired. Request a new code.</small>}
+                    {resendMessages.mobile && (
+                      <small className={`registration-resend-message ${resendMessages.mobile.type}`}>
+                        {resendMessages.mobile.text}
+                      </small>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="registration-form-group">
 
               <label>
-                User Email *
+                <span>User Email *</span>
               </label>
 
-              <input
-                type="email"
-                name="email"
-                placeholder="Enter Email"
-                value={formData.email}
-                onChange={handleChange}
-                disabled={checkingEmail && Boolean(savedVerification?.challengeId)}
-                required
-              />
-              {fieldErrors.email && <small className="registration-field-error" role="alert">{fieldErrors.email}</small>}
+              <div className="registration-contact-field">
+                <div className="registration-contact-control">
+                  <input
+                    type="email"
+                    name="email"
+                    placeholder="Enter Email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="registration-verify-contact-btn"
+                    onClick={handleStartVerification}
+                    disabled={startingVerification || Boolean(verification?.challengeId)}
+                  >
+                    {startingVerification ? "Sending..." : "Verify Email"}
+                  </button>
+                </div>
+                {fieldErrors.email && <small className="registration-field-error" role="alert">{fieldErrors.email}</small>}
+                <p className={`registration-channel-status ${verification?.emailVerified ? "verified" : ""}`}>
+                  Email: {verification?.emailVerified ? "Verified" : "Not Verified"}
+                </p>
+                {verification?.challengeId && !verification.emailVerified && (
+                  <div className="registration-channel-otp">
+                    <label htmlFor="registration-email-otp">Email OTP</label>
+                    <div className="registration-contact-control">
+                      <input
+                        id="registration-email-otp"
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        maxLength={6}
+                        placeholder="Enter 6-digit email OTP"
+                        value={otpValues.email}
+                        onChange={(event) => setOtpValues((current) => ({
+                          ...current,
+                          email: event.target.value.replace(/\D/g, "").slice(0, 6),
+                        }))}
+                        disabled={emailExpired}
+                      />
+                      <button
+                        type="button"
+                        className="registration-verify-contact-btn"
+                        onClick={() => handleVerify("email")}
+                        disabled={verifying.email || emailExpired}
+                      >
+                        {verifying.email ? "Verifying..." : "Verify OTP"}
+                      </button>
+                      <button
+                        type="button"
+                        className="registration-resend-btn"
+                        onClick={() => handleResend("email")}
+                        disabled={
+                          resending.email
+                          || verification.resendAfter.email > currentTime
+                        }
+                      >
+                        {resending.email
+                          ? "Sending..."
+                          : verification.resendAfter.email > currentTime
+                            ? `Resend in ${formatCountdown(Math.ceil((verification.resendAfter.email - currentTime) / 1000))}`
+                            : "Resend OTP"}
+                      </button>
+                    </div>
+                    {emailExpired && <small className="registration-field-error">This code has expired. Request a new code.</small>}
+                    {resendMessages.email && (
+                      <small className={`registration-resend-message ${resendMessages.email.type}`}>
+                        {resendMessages.email.text}
+                      </small>
+                    )}
+                  </div>
+                )}
+              </div>
 
             </div>
 
@@ -644,6 +839,16 @@ export default function Registration() {
               >
                 {verificationMessage.text}
               </p>
+            )}
+            {allCodesExpired && (
+              <button
+                type="button"
+                className="registration-resend-btn registration-new-codes-btn"
+                onClick={handleStartVerification}
+                disabled={startingVerification}
+              >
+                {startingVerification ? "Sending..." : "Request new verification codes"}
+              </button>
             )}
 
             {/* SUBMIT */}

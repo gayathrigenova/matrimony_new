@@ -209,14 +209,13 @@ class RegistrationSerializer(serializers.ModelSerializer):
                     challenge.consumed_at
                     or challenge.expires_at <= now
                     or not challenge.email_verified
-                    or not challenge.phone_verified
                     or challenge.email.lower() != email
                     or challenge.phone != validated_data.get("phone")
                 ):
                     raise serializers.ValidationError({
                         "verification_token": (
-                            "Verify the submitted email and mobile number before "
-                            "completing registration."
+                            "Verify the submitted email address before completing "
+                            "registration."
                         )
                     })
 

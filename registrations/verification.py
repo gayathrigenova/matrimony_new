@@ -70,9 +70,11 @@ def send_email_otp(email, otp):
         ValueError,
     ) as exc:
         logger.error(
-            "Email OTP delivery failed: exception=%s smtp_code=%s detail=%s",
+            "Email OTP delivery failed: exception=%s smtp_code=%s "
+            "http_status=%s detail=%s",
             type(exc).__name__,
             getattr(exc, "smtp_code", None),
+            getattr(exc, "status_code", None),
             safe_email_error(exc, (email, otp)),
         )
         raise VerificationDeliveryError(

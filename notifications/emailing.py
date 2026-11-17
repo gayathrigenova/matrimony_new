@@ -20,6 +20,7 @@ def safe_email_error(exc, sensitive_values=()):
     for secret in (
         settings.EMAIL_HOST_PASSWORD,
         settings.EMAIL_HOST_USER,
+        getattr(settings, "RESEND_API_KEY", ""),
         *sensitive_values,
     ):
         if secret:

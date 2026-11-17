@@ -4,12 +4,13 @@ import tempfile
 import re
 import json
 import smtplib
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
+from anymail.exceptions import AnymailError
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from PIL import Image
@@ -514,6 +515,81 @@ class RegistrationDuplicateValidationTests(TestCase):
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
         DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
+    @patch("registrations.views.send_mobile_otp")
+    def test_email_resend_and_verification_allow_registration_without_sms(
+        self, send_sms
+    ):
+        email = "email-only-registration@example.com"
+        phone = "9123456783"
+        start = self.client.post(
+            "/api/registrations/verification/start/",
+            {
+                "channel": "email",
+                "email": email,
+                "phone": phone,
+            },
+            format="json",
+        )
+        self.assertEqual(start.status_code, 200, start.data)
+        send_sms.assert_not_called()
+
+        challenge = VerificationChallenge.objects.get(pk=start.data["challenge_id"])
+        self.assertEqual(challenge.phone, phone)
+        self.assertFalse(challenge.phone_verified)
+        challenge.email_resend_after = timezone.now() - timedelta(seconds=1)
+        challenge.save(update_fields=["email_resend_after"])
+
+        resend = self.client.post(
+            "/api/registrations/verification/resend/",
+            {
+                "challenge_id": start.data["challenge_id"],
+                "channel": "email",
+            },
+            format="json",
+        )
+        self.assertEqual(resend.status_code, 200, resend.data)
+        self.assertEqual(mail.outbox[-1].to, [email])
+
+        email_otp = re.search(r"\b\d{6}\b", mail.outbox[-1].body).group()
+        verified = self.client.post(
+            "/api/registrations/verification/verify/",
+            {
+                "challenge_id": start.data["challenge_id"],
+                "channel": "email",
+                "otp": email_otp,
+            },
+            format="json",
+        )
+        self.assertEqual(verified.status_code, 200, verified.data)
+        self.assertTrue(verified.data["email_verified"])
+        self.assertFalse(verified.data["mobile_verified"])
+
+        with self.captureOnCommitCallbacks(execute=True):
+            registration_response = self.client.post(
+                "/api/registrations/",
+                {
+                    "full_name": "Email Only User",
+                    "gender": "Female",
+                    "date_of_birth": "1995-01-01",
+                    "email": email,
+                    "password": "pass123",
+                    "phone": phone,
+                    "verification_token": start.data["challenge_id"],
+                },
+                format="json",
+            )
+        self.assertEqual(registration_response.status_code, 201, registration_response.data)
+        self.assertTrue(User.objects.filter(email=email).exists())
+        self.assertEqual(
+            Registration.objects.get(user__email=email).phone,
+            phone,
+        )
+        send_sms.assert_not_called()
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
         ADMIN_NOTIFICATION_EMAIL="admin@example.com",
         ADMIN_DASHBOARD_URL="https://matrimony.example.com",
     )
@@ -592,7 +668,7 @@ class RegistrationDuplicateValidationTests(TestCase):
         self.assertEqual(mail.outbox[2].subject, "New Matrimony registration requires review")
         self.assertIn(f"/admin/view/{registration.pk}", mail.outbox[2].body)
 
-    def test_registration_cannot_complete_without_both_contact_verifications(self):
+    def test_registration_cannot_complete_without_email_verification(self):
         response = self.client.post(
             "/api/registrations/",
             {
@@ -1349,6 +1425,56 @@ class RegistrationDuplicateValidationTests(TestCase):
             if item["channel"] == "email"
         )
         self.assertIn("could not be sent", email_error["detail"])
+        send_mail_mock.assert_called_once()
+        send_mobile.assert_called_once()
+
+    @override_settings(
+        DEBUG=False,
+        EMAIL_BACKEND="anymail.backends.resend.EmailBackend",
+        RESEND_API_KEY="re_test_secret_key",
+        DEFAULT_FROM_EMAIL="onboarding@resend.dev",
+    )
+    @patch("registrations.views._new_otp", side_effect=["135790", "246801"])
+    @patch("registrations.views.send_mobile_otp", return_value="sent")
+    @patch(
+        "registrations.verification.send_mail",
+        side_effect=AnymailError(
+            "You can only send testing emails to your own email address; "
+            "recipient@example.com code 135790 key re_test_secret_key",
+            status_code=403,
+            response=Mock(
+                reason="Forbidden",
+                json=Mock(return_value={
+                    "message": "You can only send testing emails to your own "
+                    "email address: recipient@example.com code 135790 key "
+                    "re_test_secret_key"
+                }),
+            ),
+        ),
+    )
+    def test_resend_recipient_restriction_surfaces_in_safe_logs_via_registration(
+        self, send_mail_mock, send_mobile, _new_otp
+    ):
+        with self.assertLogs("registrations.verification", level="ERROR") as logs:
+            response = self.client.post(
+                "/api/registrations/verification/start/",
+                {"email": "recipient@example.com", "phone": "9123456780"},
+                format="json",
+            )
+
+        log_output = "\n".join(logs.output)
+        response_json = json.dumps(response.data)
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("http_status=403", log_output)
+        self.assertIn("only send testing emails", log_output)
+        for secret in (
+            "recipient@example.com",
+            "135790",
+            "re_test_secret_key",
+        ):
+            self.assertNotIn(secret, log_output)
+            self.assertNotIn(secret, response_json)
+        self.assertIn("could not be sent", response_json)
         send_mail_mock.assert_called_once()
         send_mobile.assert_called_once()
 

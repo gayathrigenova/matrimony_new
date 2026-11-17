@@ -287,13 +287,181 @@ def _challenge_response_data(challenge, now):
         },
         "email_verified": challenge.email_verified,
         "mobile_verified": challenge.phone_verified,
+        "email_started": bool(challenge.email_otp_hash),
+        "mobile_started": bool(challenge.phone_otp_hash),
     }
 
 
 class VerificationStartView(APIView):
     permission_classes = [AllowAny]
 
+    def _start_channel_verification(self, request, channel):
+        if channel not in ("email", "mobile"):
+            return Response(
+                {"detail": "Choose email or mobile verification."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        field = "email" if channel == "email" else "phone"
+        contact = str(request.data.get(field, "")).strip()
+        if channel == "email":
+            contact = contact.lower()
+        if not contact:
+            return Response(
+                {field: f"A {'email address' if channel == 'email' else 'mobile number'} is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if channel == "email":
+            try:
+                validate_email(contact)
+            except DjangoValidationError:
+                return Response(
+                    {"email": "Enter a valid email address."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        User = get_user_model()
+        already_registered = (
+            User.objects.filter(email__iexact=contact).exists()
+            if channel == "email"
+            else Registration.objects.filter(phone__iexact=contact).exists()
+        )
+        if already_registered:
+            key = "email" if channel == "email" else "phone"
+            message = (
+                "This email address is already registered."
+                if channel == "email"
+                else "This phone number is already registered."
+            )
+            return Response(
+                {
+                    "detail": "Please use available contact information.",
+                    "errors": {key: message},
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        now = timezone.now()
+        requested_challenge_id = request.data.get("challenge_id")
+        if requested_challenge_id:
+            try:
+                challenge = VerificationChallenge.objects.get(
+                    pk=requested_challenge_id,
+                )
+            except (
+                VerificationChallenge.DoesNotExist,
+                DjangoValidationError,
+                ValueError,
+                TypeError,
+            ):
+                return Response(
+                    {
+                        "detail": (
+                            "The saved verification request could not be restored. "
+                            "Request new codes."
+                        )
+                    },
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            if challenge.consumed_at or challenge.expires_at <= now:
+                return Response(
+                    {
+                        "detail": (
+                            "This verification request has expired. Request new codes."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if getattr(challenge, field) and getattr(challenge, field) != contact:
+                return Response(
+                    {"detail": "The contact does not match this verification request."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if getattr(challenge, f"{field}_otp_hash"):
+                data = _challenge_response_data(challenge, now)
+                data.update({
+                    "verification_in_progress": True,
+                    "email_delivery": "restored" if channel == "email" else None,
+                    "mobile_delivery": "restored" if channel == "mobile" else None,
+                })
+                if challenge.email_verified and challenge.phone_verified:
+                    data["verification_token"] = str(challenge.pk)
+                return Response(data, status=status.HTTP_200_OK)
+        else:
+            email = (
+                str(request.data.get("email", "")).strip().lower()
+                if channel == "mobile"
+                else contact
+            )
+            phone = (
+                str(request.data.get("phone", "")).strip()
+                if channel == "email"
+                else contact
+            )
+            challenge = None
+
+        otp = _new_otp()
+        expires_at = _otp_expiry()
+        cooldown = timedelta(seconds=settings.OTP_RESEND_COOLDOWN_SECONDS)
+        if requested_challenge_id:
+            setattr(challenge, field, contact)
+            setattr(challenge, f"{field}_otp_hash", make_password(otp))
+            setattr(challenge, f"{field}_attempts", 0)
+            setattr(challenge, f"{field}_verified", False)
+            setattr(challenge, f"{field}_resend_after", now + cooldown)
+            setattr(challenge, f"{field}_expires_at", expires_at)
+            challenge.expires_at = max(
+                challenge.email_expires_at,
+                challenge.phone_expires_at,
+            )
+            challenge.save()
+        else:
+            email_expires_at = expires_at if channel == "email" else now
+            phone_expires_at = expires_at if channel == "mobile" else now
+            challenge = VerificationChallenge.objects.create(
+                email=email,
+                phone=phone,
+                email_otp_hash=make_password(otp) if channel == "email" else "",
+                phone_otp_hash=make_password(otp) if channel == "mobile" else "",
+                email_resend_after=now + cooldown if channel == "email" else now,
+                phone_resend_after=now + cooldown if channel == "mobile" else now,
+                email_expires_at=email_expires_at,
+                phone_expires_at=phone_expires_at,
+                expires_at=expires_at,
+            )
+
+        sender = send_email_otp if channel == "email" else send_mobile_otp
+        try:
+            delivery_mode = sender(contact, otp)
+        except VerificationDeliveryError as exc:
+            logger.warning("Verification %s delivery failed: %s", channel, exc)
+            challenge.consumed_at = timezone.now()
+            challenge.save(update_fields=["consumed_at"])
+            return Response(
+                {
+                    "detail": (
+                        "Verification could not be completed. Check the delivery "
+                        "details and try again."
+                    ),
+                    "delivery_errors": [{"channel": channel, "detail": str(exc)}],
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        data = _challenge_response_data(challenge, timezone.now())
+        data.update({
+            "verification_in_progress": True,
+            "email_delivery": delivery_mode if channel == "email" else None,
+            "mobile_delivery": delivery_mode if channel == "mobile" else None,
+        })
+        return Response(data, status=status.HTTP_200_OK)
+
     def post(self, request):
+        channel = request.data.get("channel")
+        if channel is not None:
+            return self._start_channel_verification(request, channel)
+
         email = str(request.data.get("email", "")).strip().lower()
         phone = str(request.data.get("phone", "")).strip()
         if not email or not phone:

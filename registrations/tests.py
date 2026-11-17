@@ -391,6 +391,129 @@ class RegistrationDuplicateValidationTests(TestCase):
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
         DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
+    @patch("registrations.views.send_mobile_otp")
+    def test_channel_start_verifies_only_the_selected_contact(self, send_sms):
+        email_start = self.client.post(
+            "/api/registrations/verification/start/",
+            {
+                "channel": "email",
+                "email": "new-email@example.com",
+                "phone": "9876543210",
+            },
+            format="json",
+        )
+        self.assertEqual(email_start.status_code, 200, email_start.data)
+        self.assertEqual(email_start.data["email_started"], True)
+        self.assertEqual(email_start.data["mobile_started"], False)
+        self.assertEqual(mail.outbox[-1].to, ["new-email@example.com"])
+        send_sms.assert_not_called()
+
+        email_otp = re.search(r"\b\d{6}\b", mail.outbox[-1].body).group()
+        email_verified = self.client.post(
+            "/api/registrations/verification/verify/",
+            {
+                "challenge_id": email_start.data["challenge_id"],
+                "channel": "email",
+                "otp": email_otp,
+            },
+            format="json",
+        )
+        self.assertEqual(email_verified.status_code, 200, email_verified.data)
+        self.assertTrue(email_verified.data["email_verified"])
+        self.assertFalse(email_verified.data["mobile_verified"])
+
+        mobile_start = self.client.post(
+            "/api/registrations/verification/start/",
+            {
+                "channel": "mobile",
+                "email": "existing@example.com",
+                "phone": "9123456781",
+            },
+            format="json",
+        )
+        self.assertEqual(mobile_start.status_code, 200, mobile_start.data)
+        self.assertEqual(mobile_start.data["email_started"], False)
+        self.assertEqual(mobile_start.data["mobile_started"], True)
+        send_sms.assert_called_once()
+        self.assertEqual(send_sms.call_args.args[0], "9123456781")
+
+        mobile_verified = self.client.post(
+            "/api/registrations/verification/verify/",
+            {
+                "challenge_id": mobile_start.data["challenge_id"],
+                "channel": "mobile",
+                "phone": "9123456781",
+                "otp": send_sms.call_args.args[1],
+            },
+            format="json",
+        )
+        self.assertEqual(mobile_verified.status_code, 200, mobile_verified.data)
+        self.assertTrue(mobile_verified.data["mobile_verified"])
+        self.assertFalse(mobile_verified.data["email_verified"])
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
+    @patch("registrations.views.send_mobile_otp")
+    def test_channel_verifications_share_a_bound_registration_challenge(self, send_sms):
+        email_start = self.client.post(
+            "/api/registrations/verification/start/",
+            {
+                "channel": "email",
+                "email": "combined@example.com",
+            },
+            format="json",
+        )
+        self.assertEqual(email_start.status_code, 200, email_start.data)
+
+        mobile_start = self.client.post(
+            "/api/registrations/verification/start/",
+            {
+                "channel": "mobile",
+                "challenge_id": email_start.data["challenge_id"],
+                "phone": "9123456782",
+            },
+            format="json",
+        )
+        self.assertEqual(mobile_start.status_code, 200, mobile_start.data)
+        self.assertEqual(mobile_start.data["challenge_id"], email_start.data["challenge_id"])
+        self.assertTrue(mobile_start.data["email_started"])
+        self.assertTrue(mobile_start.data["mobile_started"])
+        self.assertEqual(send_sms.call_args.args[0], "9123456782")
+
+        email_verified = self.client.post(
+            "/api/registrations/verification/verify/",
+            {
+                "challenge_id": email_start.data["challenge_id"],
+                "channel": "email",
+                "otp": re.search(r"\b\d{6}\b", mail.outbox[-1].body).group(),
+            },
+            format="json",
+        )
+        mobile_verified = self.client.post(
+            "/api/registrations/verification/verify/",
+            {
+                "challenge_id": email_start.data["challenge_id"],
+                "channel": "mobile",
+                "phone": "9123456782",
+                "otp": send_sms.call_args.args[1],
+            },
+            format="json",
+        )
+
+        self.assertEqual(email_verified.status_code, 200, email_verified.data)
+        self.assertNotIn("verification_token", email_verified.data)
+        self.assertEqual(mobile_verified.status_code, 200, mobile_verified.data)
+        self.assertEqual(
+            mobile_verified.data["verification_token"],
+            email_start.data["challenge_id"],
+        )
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
         ADMIN_NOTIFICATION_EMAIL="admin@example.com",
         ADMIN_DASHBOARD_URL="https://matrimony.example.com",
     )

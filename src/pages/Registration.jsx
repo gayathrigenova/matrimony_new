@@ -169,7 +169,8 @@ export default function Registration() {
     }
   };
 
-  const handleStartVerification = async () => {
+  const handleStartVerification = async (channel, startFresh = false) => {
+    if (!channel) return;
     if (startingVerification) return;
     setStartingVerification(true);
     setFieldErrors((prev) => ({ ...prev, email: "", phone: "" }));
@@ -179,8 +180,15 @@ export default function Registration() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: formData.email.trim().toLowerCase(),
-          phone: formData.phone.trim(),
+          channel,
+          ...(channel === "email"
+            ? { email: formData.email.trim().toLowerCase() }
+            : { phone: formData.phone.trim() }),
+          ...(
+            verification?.challengeId && !startFresh && !allCodesExpired
+              ? { challenge_id: verification.challengeId }
+              : {}
+          ),
         }),
       });
       const result = await readApiResponse(response);
@@ -197,20 +205,22 @@ export default function Registration() {
       setOtpValues({ email: "", mobile: "" });
 
       const deliveryNotes = [];
-      if (result.email_delivery === "sent") {
-        deliveryNotes.push("Email OTP sent.");
-      } else if (result.email_delivery === "console") {
+      const delivery = result[`${channel}_delivery`];
+      if (delivery === "sent") {
+        deliveryNotes.push(channel === "email" ? "Email OTP sent." : "Mobile OTP sent by SMS.");
+      } else if (delivery === "console") {
         deliveryNotes.push("Development mode: the email code is in the backend console; no email was sent.");
-      }
-      if (result.mobile_delivery === "sent") {
-        deliveryNotes.push("Mobile OTP sent by SMS.");
-      } else if (result.mobile_delivery === "development_console") {
+      } else if (delivery === "development_console") {
         deliveryNotes.push("Development mode: no SMS was sent; the mobile code is in the backend console.");
+      } else if (delivery === "restored") {
+        deliveryNotes.push(
+          channel === "email"
+            ? "An email verification code is already active."
+            : "A mobile verification code is already active.",
+        );
       }
       setVerificationMessage({
-        type: result.email_delivery === "sent" && result.mobile_delivery === "sent"
-          ? "success"
-          : "info",
+        type: delivery === "sent" ? "success" : "info",
         text: deliveryNotes.join(" "),
       });
     } catch (error) {
@@ -606,8 +616,11 @@ export default function Registration() {
                   <button
                     type="button"
                     className="registration-verify-contact-btn"
-                    onClick={handleStartVerification}
-                    disabled={startingVerification || Boolean(verification?.challengeId)}
+                    onClick={() => handleStartVerification("mobile")}
+                    disabled={
+                      startingVerification
+                      || (verification?.mobileVerified && !allCodesExpired)
+                    }
                   >
                     {startingVerification ? "Sending..." : "Verify Mobile"}
                   </button>
@@ -616,7 +629,9 @@ export default function Registration() {
                 <p className={`registration-channel-status ${verification?.mobileVerified ? "verified" : ""}`}>
                   Mobile: {verification?.mobileVerified ? "Verified" : "Not Verified"}
                 </p>
-                {verification?.challengeId && !verification.mobileVerified && (
+                {verification?.challengeId
+                  && verification.mobileStarted
+                  && !verification.mobileVerified && (
                   <div className="registration-channel-otp">
                     <label htmlFor="registration-mobile-otp">Mobile OTP</label>
                     <div className="registration-contact-control">
@@ -688,8 +703,11 @@ export default function Registration() {
                   <button
                     type="button"
                     className="registration-verify-contact-btn"
-                    onClick={handleStartVerification}
-                    disabled={startingVerification || Boolean(verification?.challengeId)}
+                    onClick={() => handleStartVerification("email")}
+                    disabled={
+                      startingVerification
+                      || (verification?.emailVerified && !allCodesExpired)
+                    }
                   >
                     {startingVerification ? "Sending..." : "Verify Email"}
                   </button>
@@ -698,7 +716,9 @@ export default function Registration() {
                 <p className={`registration-channel-status ${verification?.emailVerified ? "verified" : ""}`}>
                   Email: {verification?.emailVerified ? "Verified" : "Not Verified"}
                 </p>
-                {verification?.challengeId && !verification.emailVerified && (
+                {verification?.challengeId
+                  && verification.emailStarted
+                  && !verification.emailVerified && (
                   <div className="registration-channel-otp">
                     <label htmlFor="registration-email-otp">Email OTP</label>
                     <div className="registration-contact-control">
@@ -844,7 +864,7 @@ export default function Registration() {
               <button
                 type="button"
                 className="registration-resend-btn registration-new-codes-btn"
-                onClick={handleStartVerification}
+                onClick={() => handleStartVerification("email", true)}
                 disabled={startingVerification}
               >
                 {startingVerification ? "Sending..." : "Request new verification codes"}
@@ -911,6 +931,8 @@ function createVerificationState(result, now) {
     challengeId: result.challenge_id,
     emailVerified: Boolean(result.email_verified),
     mobileVerified: Boolean(result.mobile_verified),
+    emailStarted: Boolean(result.email_started),
+    mobileStarted: Boolean(result.mobile_started),
     mobileDelivery: result.mobile_delivery,
     emailDelivery: result.email_delivery,
     resendAfter: {

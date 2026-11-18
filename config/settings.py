@@ -20,7 +20,7 @@ DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 ALLOWED_HOSTS = [
     host.strip() for host in os.getenv(
         "DJANGO_ALLOWED_HOSTS",
-        "matrimonynew-production.up.railway.app,localhost,127.0.0.1",
+        "matrimonynew-production.up.railway.app,localhost,127.0.0.1,keralakkaramatrimony.com,www.keralakkaramatrimony.com",
     ).split(",") if host.strip()
 ]
 
@@ -286,7 +286,7 @@ CORS_ALLOW_HEADERS = [
 CSRF_TRUSTED_ORIGINS = [
     origin.strip().rstrip("/") for origin in os.getenv(
         "CSRF_TRUSTED_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173,https://matrimony-sepia-phi.vercel.app,https://matrimonynew-production.up.railway.app",
+        "http://localhost:5173,http://127.0.0.1:5173,https://matrimony-sepia-phi.vercel.app,https://matrimonynew-production.up.railway.app,https://keralakkaramatrimony.com,https://www.keralakkaramatrimony.com",
     ).split(",") if origin.strip()
 ]
 

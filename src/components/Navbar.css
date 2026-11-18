@@ -312,8 +312,12 @@
   .wn-nav-links { gap: 1.5rem; }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 768px), (hover: none) and (pointer: coarse) {
   .wn-navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
     min-height: 80px;
     padding: 0.7rem 1rem;
     position: relative;
@@ -322,7 +326,7 @@
   }
   .wn-nav-brand {
     flex: 0 0 auto;
-    margin-right: auto;
+    margin-right: 0;
   }
   .wn-logo-graphic { width: 64px; height: 58px; }
   .wn-logo-img {
@@ -360,9 +364,11 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    flex: 0 0 auto;
-    margin-left: 0.35rem;
-    padding: 0.25rem;
+    flex: 0 0 44px;
+    width: 44px;
+    min-height: 44px;
+    margin-left: 0;
+    padding: 0;
     color: #333;
     line-height: 1;
   }

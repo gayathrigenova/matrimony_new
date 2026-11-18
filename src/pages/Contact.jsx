@@ -1,15 +1,44 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import './Contact.css';
+import contactImage from '../assets/img8.png';
+import { API_URL, readApiResponse } from '../api.js';
 
 export default function Contact() {
   const [formData, setFormData] = useState({ name: '', email: '', phone: '', subject: '', message: '' });
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const submissionInProgress = useRef(false);
 
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setSubmitError('');
+  };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitted(true);
+    if (submissionInProgress.current) return;
+
+    submissionInProgress.current = true;
+    setSubmitting(true);
+    setSubmitError('');
+    try {
+      const response = await fetch(`${API_URL}/enquiries/contact/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      const result = await readApiResponse(response);
+      if (!response.ok) {
+        throw new Error(result.detail || 'We could not send your message right now. Please try again.');
+      }
+      setSubmitted(true);
+    } catch {
+      setSubmitError('We could not send your message right now. Please try again.');
+    } finally {
+      submissionInProgress.current = false;
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -51,7 +80,7 @@ export default function Contact() {
               <div className="contact-success-icon">✓</div>
               <h3>Thank You, {formData.name}!</h3>
               <p>Your message has been received. We'll contact you soon.</p>
-              <button onClick={() => { setSubmitted(false); setFormData({ name: '', email: '', phone: '', subject: '', message: '' }); }}>
+              <button onClick={() => { setSubmitted(false); setSubmitError(''); setFormData({ name: '', email: '', phone: '', subject: '', message: '' }); }}>
                 Send Another Message
               </button>
             </div>
@@ -79,15 +108,18 @@ export default function Contact() {
                 <label>Message</label>
                 <textarea name="message" rows="5" placeholder="Write your message here..." value={formData.message} onChange={handleChange} required />
               </div>
-              <button type="submit" className="cf-submit-btn">Send Message →</button>
+              {submitError && <p className="contact-submit-error" role="alert">{submitError}</p>}
+              <button type="submit" className="cf-submit-btn" disabled={submitting}>
+                {submitting ? 'Sending...' : 'Send Message →'}
+              </button>
             </form>
           )}
         </div>
 
         {/* Side Image + Social */}
         <div className="contact-side">
-          <img src="https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=600&q=80" alt="Contact" />
-          <div className="contact-social-card">
+          <img src={contactImage} alt="Contact" />
+          {/* <div className="contact-social-card">
             <h3>Follow Us</h3>
             <div className="contact-socials">
               {[
@@ -104,7 +136,7 @@ export default function Contact() {
                 </div>
               ))}
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
 

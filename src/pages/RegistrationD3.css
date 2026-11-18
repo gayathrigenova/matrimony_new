@@ -9,7 +9,7 @@
   text-align: center;
   background:
     linear-gradient(115deg, rgba(15, 54, 38, 0.8), rgba(104, 0, 54, 0.72)),
-    url("https://images.unsplash.com/photo-1520854221256-17451cc331bf?w=1600&auto=format&fit=crop&q=85") center 45% / cover no-repeat;
+    url("../assets/img1.png") center 45% / cover no-repeat;
 }
 
 .reg3-banner::after {

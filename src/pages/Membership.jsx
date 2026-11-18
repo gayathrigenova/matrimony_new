@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { API_URL, fetchWithTokenRefresh, readApiResponse } from "../api.js";
+import testimonialImageOne from "../assets/img2.png";
+import testimonialImageTwo from "../assets/img8.png";
+import testimonialImageThree from "../assets/img7.png";
 import './Membership.css';
 
 const plans = [
@@ -23,9 +26,9 @@ const plans = [
 ];
 
 const testimonials = [
-  { img: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=300&q=80", names: "Ananya & Vikram", text: "We found each other through the Gold plan. Best decision ever!", stars: 5 },
-  { img: "https://images.unsplash.com/photo-1522673607200-164d1b6ce486?w=300&q=80", names: "Priya & Arjun", text: "The Diamond plan's relationship manager made everything so easy.", stars: 5 },
-  { img: "https://images.unsplash.com/photo-1519741497674-611481863552?w=300&q=80", names: "Meera & Rohan", text: "Verified profiles gave us the confidence to connect. Happily married!", stars: 5 },
+  { img: testimonialImageOne, names: "Ananya & Vikram", text: "We found each other through the Gold plan. Best decision ever!", stars: 5 },
+  { img: testimonialImageTwo, names: "Priya & Arjun", text: "The Diamond plan's relationship manager made everything so easy.", stars: 5 },
+  { img: testimonialImageThree, names: "Meera & Rohan", text: "Verified profiles gave us the confidence to connect. Happily married!", stars: 5 },
 ];
 
 export default function Membership() {
@@ -172,7 +175,7 @@ export default function Membership() {
       {/* Benefits with Image */}
       {/* <div className="mem-benefits-section">
         <div className="mem-benefits-img">
-          <img src="https://images.unsplash.com/photo-1583939003579-730e3918a45a?w=600&q=80" alt="Happy Couple" />
+          <img src={testimonialImageOne} alt="Happy Couple" />
         </div>
         <div className="mem-benefits-text">
           <h2>Why Upgrade to Premium?</h2>

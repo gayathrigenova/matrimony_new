@@ -22,7 +22,7 @@
       rgba(159, 230, 153, 0.658) 50%,
       rgba(160, 0, 79, 0.5) 100%
     ),
-    url("https://images.unsplash.com/photo-1520854221256-17451cc331bf?w=1200&auto=format&fit=crop&q=80")
+    url("../assets/img2.png")
       center / cover no-repeat;
 
   min-height: 220px;

@@ -180,9 +180,9 @@ export default function Search() {
         <p className="section-sub">Trusted by millions of families across India</p>
         <div className="why-cards">
           {[
-            { img: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=400&q=80", title: "Verified Profiles", desc: "Every profile is manually verified for authenticity and trust." },
-            { img: "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=400&q=80", title: "Smart Matching", desc: "AI-powered matching based on your preferences and horoscope." },
-            { img: "https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=400&q=80", title: "Privacy First", desc: "Your contact details are shared only with your consent." },
+            { img: new URL("../assets/img2.png", import.meta.url).href, title: "Verified Profiles", desc: "Every profile is manually verified for authenticity and trust." },
+            { img: new URL("../assets/img8.png", import.meta.url).href, title: "Smart Matching", desc: "AI-powered matching based on your preferences and horoscope." },
+            { img: new URL("../assets/img1.png", import.meta.url).href, title: "Privacy First", desc: "Your contact details are shared only with your consent." },
           ].map(c => (
             <div className="why-card" key={c.title}>
               <img src={c.img} alt={c.title} />

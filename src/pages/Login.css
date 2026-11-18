@@ -116,7 +116,7 @@
       rgba(255, 255, 255, 0.83),
       rgba(2, 69, 38, 0.55)
     ),
-    url("https://images.unsplash.com/photo-1560145725-18e738a9a336?auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8d2VkZGRpbmclMjBiYWNrZ3JvdW5kfGVufDB8fDB8fHww")
+    url("../assets/img3.png")
       center / cover no-repeat;
 
   display: flex;

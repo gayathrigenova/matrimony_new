@@ -7,7 +7,7 @@
     rgba(140, 239, 189, 0.6) 50%,
     rgba(3, 100, 51, 0.55) 100%
   ),
-  url("https://images.unsplash.com/photo-1519657502999-ab785d28a1f6?w=2400&auto=format&fit=crop&q=100");
+  url("../assets/img4.png");
 
 background-size: cover;
 background-position: center;
@@ -213,6 +213,8 @@ background-repeat: no-repeat;
 }
 
 .cf-submit-btn:hover { opacity: 0.9; transform: translateY(-2px); }
+.cf-submit-btn:disabled { cursor: wait; opacity: 0.75; transform: none; }
+.contact-submit-error { color: #b42318; margin: 0 0 0.75rem; }
 
 /* ===== SUCCESS ===== */
 .contact-success {

@@ -2,6 +2,7 @@ asgiref==3.12.1
 Django==6.0.8
 django-cors-headers==4.9.0
 django-anymail==15.2
+resend
 djangorestframework==3.18.0
 djangorestframework_simplejwt==5.5.1
 gunicorn==26.2.0

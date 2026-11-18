@@ -36,6 +36,7 @@ class FeaturedProfileListTests(TestCase):
         profile = response.data[0]
         self.assertEqual(profile["id"], self.profile.pk)
         self.assertEqual(profile["full_name"], "Featured Member")
+        self.assertEqual(profile["gender"], "Female")
         self.assertEqual(profile["occupation"], "Software Developer")
         self.assertEqual(profile["caste"], "Thiyya")
         self.assertEqual(profile["district"], "Kollam")
@@ -44,6 +45,28 @@ class FeaturedProfileListTests(TestCase):
         self.assertNotIn("email", profile)
         self.assertNotIn("birth_star", profile)
         self.assertIn("profile_photo_url", profile)
+
+    def test_featured_profiles_include_gender_values_used_by_registration(self):
+        male_user = User.objects.create_user(
+            email="featured-male@example.com",
+            password="test-password",
+            full_name="Featured Male Member",
+        )
+        Registration.objects.create(
+            user=male_user,
+            full_name="Featured Male Member",
+            gender="Male",
+            date_of_birth=date(1998, 1, 1),
+            status=Registration.Status.PUBLISHED,
+        )
+
+        response = self.client.get("/api/registrations/featured/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            {profile["gender"] for profile in response.data},
+            {"Female", "Male"},
+        )
 
     def test_unpublished_profiles_are_not_featured(self):
         self.profile.status = Registration.Status.APPROVED

@@ -325,6 +325,7 @@ class FeaturedProfileSerializer(PublicProfileSerializer):
             "id",
             "matrimony_id",
             "full_name",
+            "gender",
             "age",
             "occupation",
             "occupation_level",

@@ -313,17 +313,49 @@
 
 @media (max-width: 850px) {
   .wn-navbar {
-    padding: 1rem 1.5rem;
+    min-height: 76px;
+    padding: 0.45rem 1rem;
     position: relative;
     background: #ffffff;
+    box-sizing: border-box;
+  }
+  .wn-nav-brand {
+    flex: 0 0 auto;
+    margin-right: auto;
+  }
+  .wn-logo-graphic { width: 64px; height: 58px; }
+  .wn-logo-img {
+    width: 64px;
+    height: 58px;
+    margin-left: 0;
+    object-fit: contain;
   }
   .wn-brand-text h2 { color: #00ab5b; }
   .wn-sub-text { color: #00ab5b; }
   /* Hide desktop search bar, show mobile icon */
   .wn-desktop-search { display: none; }
-  .wn-mobile-search-icon { display: block; color: #333; }
+  .wn-mobile-search-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    margin-left: 0;
+    padding: 0.35rem;
+    color: #333;
+    font-size: 1.7rem;
+    line-height: 1;
+  }
   .wn-mobile-search-bar { display: block; }
-  .wn-menu-toggle { display: block; color: #333; }
+  .wn-menu-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    margin-left: 0.35rem;
+    padding: 0.25rem;
+    color: #333;
+    line-height: 1;
+  }
   /* Hide nav-actions entirely on mobile */
   .wn-nav-actions { display: none !important; }
   .wn-nav-links {
@@ -355,8 +387,7 @@
 }
 
 @media (max-width: 480px) {
-  .wn-navbar { padding: 0.75rem 1rem; }
+  .wn-navbar { min-height: 76px; padding: 0.45rem 1rem; }
   .wn-brand-text h2 { font-size: 1.4rem; }
   .wn-sub-text { font-size: 0.65rem; }
-  .wn-logo-graphic { width: 36px; height: 24px; }
 }

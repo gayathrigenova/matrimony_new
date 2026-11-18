@@ -351,7 +351,7 @@ export default function Home() {
           <Phone size={22} />
           <div>
             <h4>Call Us</h4>
-            <a href="tel:+919000000000">9000000000</a>
+            <a href="tel:+917559080005">+91 755 908 0005</a>
           </div>
         </div>
 
@@ -360,11 +360,11 @@ export default function Home() {
           <div>
             <h4>WhatsApp</h4>
             <a
-              href="https://wa.me/919000000000"
+              href="https://wa.me/917559080005"
               target="_blank"
               rel="noreferrer"
             >
-              9000000000
+              +91 755 908 0005
             </a>
           </div>
         </div>

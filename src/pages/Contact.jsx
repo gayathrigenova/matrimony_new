@@ -27,8 +27,8 @@ export default function Contact() {
       <div className="contact-info-strip">
         {[
           { icon: "📍", title: "Our Office", lines: ["westhill", "kozhikode Kerala "] },
-          { icon: "📞", title: "Phone Support", lines: ["+91 (000) 235-0000", "+91 90000 10005 (Toll Free)"] },
-          { icon: "✉️", title: "Email Us", lines: ["keralakkaramatrimony@gmail.com", "help@keralakara.com"] },
+          { icon: "📞", title: "Phone Support", lines: ["+91 755 908 0005"] },
+          { icon: "✉️", title: "Email Us", lines: ["keralakkaramatrimony@gmail.com"] },
           { icon: "⏰", title: "Working Hours", lines: ["Mon – Sat: 9:00 AM – 8:00 PM", "Sunday: 10:00 AM – 4:00 PM"] },
         ].map(c => (
           <div className="contact-info-card" key={c.title}>

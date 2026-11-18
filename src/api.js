@@ -1,5 +1,5 @@
 const configuredApiUrl = import.meta.env.VITE_API_URL?.trim();
-const API_ROOT = (configuredApiUrl || "https://matrimonynew-production.up.railway.app")
+const API_ROOT = (configuredApiUrl || "https://keralakkaramatrimony.com")
   .replace(/\/+$/, "")
   .replace(/\/api$/i, "");
 

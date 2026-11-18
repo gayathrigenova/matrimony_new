@@ -128,7 +128,16 @@ export default function Navbar() {
       </div>
 
       {/* Mobile: Search Icon (left of hamburger) */}
-      <button className="wn-mobile-search-icon" onClick={() => setSearchOpen(!searchOpen)}>
+      <button
+        type="button"
+        className="wn-mobile-search-icon"
+        aria-label="Search profiles"
+        aria-expanded={searchOpen}
+        onClick={() => {
+          setSearchOpen(!searchOpen);
+          setIsOpen(false);
+        }}
+      >
         ⌕
       </button>
 
@@ -150,12 +159,22 @@ export default function Navbar() {
       )}
 
       {/* Hamburger Toggle Button for Mobile */}
-      <button className="wn-menu-toggle" onClick={() => setIsOpen(!isOpen)}>
+      <button
+        type="button"
+        className="wn-menu-toggle"
+        aria-label={isOpen ? "Close navigation menu" : "Open navigation menu"}
+        aria-expanded={isOpen}
+        aria-controls="mobile-navigation"
+        onClick={() => {
+          setIsOpen(!isOpen);
+          setSearchOpen(false);
+        }}
+      >
         {isOpen ? '✕' : '☰'}
       </button>
 
       {/* Center: Navigation Links */}
-      <ul className={`wn-nav-links ${isOpen ? 'open' : ''}`}>
+      <ul id="mobile-navigation" className={`wn-nav-links ${isOpen ? 'open' : ''}`}>
         {pages.map((page) => (
           <li key={page.path}>
             <NavLink

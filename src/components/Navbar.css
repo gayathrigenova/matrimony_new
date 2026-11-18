@@ -313,8 +313,8 @@
 
 @media (max-width: 850px) {
   .wn-navbar {
-    min-height: 76px;
-    padding: 0.45rem 1rem;
+    min-height: 80px;
+    padding: 0.7rem 1rem;
     position: relative;
     background: #ffffff;
     box-sizing: border-box;
@@ -363,17 +363,17 @@
     top: 100%;
     left: 0;
     width: 100%;
+    display: none;
     background: #ffffff;
     flex-direction: column;
     align-items: stretch;
     gap: 0;
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.3s ease-in-out;
+    max-height: calc(100vh - 80px);
+    overflow-y: auto;
     box-shadow: 0 10px 15px rgba(0,0,0,0.15);
-    z-index: 999;
+    z-index: 1;
   }
-  .wn-nav-links.open { max-height: 500px; }
+  .wn-nav-links.open { display: flex; }
   .wn-nav-link {
     color: #333333;
     padding: 0.8rem 1.5rem;
@@ -387,7 +387,7 @@
 }
 
 @media (max-width: 480px) {
-  .wn-navbar { min-height: 76px; padding: 0.45rem 1rem; }
+  .wn-navbar { min-height: 80px; padding: 0.7rem 1rem; }
   .wn-brand-text h2 { font-size: 1.4rem; }
   .wn-sub-text { font-size: 0.65rem; }
 }

@@ -5,7 +5,8 @@ import smtplib
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-from django.core.mail import send_mail
+from django.core.mail import EmailMultiAlternatives, send_mail
+from django.template.loader import render_to_string
 from django.utils import timezone
 
 
@@ -86,19 +87,53 @@ def _format_changed_fields(changed_fields):
 
 
 def notify_registration_completed(registration):
-    registered_date = timezone.localtime(registration.created_at).strftime("%B %d, %Y")
-    send_profile_email(
-        "Your Matrimony registration is complete",
-        (
-            f"Hello {registration.full_name},\n\n"
-            "Your registration has been received successfully.\n"
-            f"Registration date: {registered_date}\n"
-            f"Profile ID: {_profile_label(registration)}\n\n"
-            "Your profile is pending admin verification. We will notify you "
-            "when it has been reviewed."
-        ),
-        registration.user.email,
+    profile_id = registration.matrimony_id or ""
+    full_name = registration.full_name or "there"
+    profile_id_text = (
+        f"Matrimony Profile ID / Nest ID: {profile_id}\n\n"
+        if profile_id else ""
     )
+    text_body = (
+        f"Hello {full_name},\n\n"
+        "Welcome to Kerala Kakkaram Matrimony!\n\n"
+        "Your registration was successful. Thank you for choosing Kerala "
+        "Kakkaram Matrimony.\n\n"
+        f"{profile_id_text}"
+        "If admin approval is required for your profile, our team will review "
+        "it and contact you when the review is complete.\n\n"
+        "Warm regards,\nKerala Kakkaram Matrimony"
+    )
+
+    try:
+        html_body = render_to_string(
+            "notifications/registration_confirmation_email.html",
+            {
+                "full_name": full_name,
+                "profile_id": profile_id,
+            },
+        )
+        email = EmailMultiAlternatives(
+            subject="Welcome to Kerala Kakkaram Matrimony!",
+            body=text_body,
+            from_email="info@keralakkaramatrimony.com",
+            to=[registration.user.email],
+        )
+        email.attach_alternative(html_body, "text/html")
+        sent_count = email.send(fail_silently=False)
+    except Exception as exc:
+        logger.error(
+            "Registration confirmation email delivery failed: exception=%s detail=%s",
+            type(exc).__name__,
+            safe_email_error(exc, (registration.user.email,)),
+        )
+        return False
+
+    if sent_count != 1:
+        logger.error(
+            "Registration confirmation email was not accepted by the configured email backend."
+        )
+        return False
+    return True
 
 
 def notify_admin_new_registration(registration):

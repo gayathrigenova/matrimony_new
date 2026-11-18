@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Welcome to Kerala Kakkaram Matrimony</title>
+  </head>
+  <body style="margin:0; padding:24px 12px; background-color:#f3f7f4; font-family:Arial,Helvetica,sans-serif; color:#26352d;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px; margin:0 auto; background-color:#ffffff; border-radius:12px; overflow:hidden;">
+      <tr>
+        <td style="padding:30px 24px; text-align:center; background-color:#00733c; color:#ffffff;">
+          <p style="margin:0; font-size:13px; letter-spacing:2px; text-transform:uppercase; color:#d9f4e5;">Kerala Kakkaram Matrimony</p>
+          <h1 style="margin:12px 0 0; font-size:26px; line-height:1.25;">Welcome!</h1>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:32px 30px; font-size:16px; line-height:1.65;">
+          <p style="margin:0 0 16px;">Hello {{ full_name }},</p>
+          <p style="margin:0 0 16px;">We’re delighted to welcome you to Kerala Kakkaram Matrimony. Your registration was completed successfully.</p>
+          {% if profile_id %}
+          <div style="margin:24px 0; padding:16px 18px; border-left:4px solid #00ab5b; border-radius:6px; background-color:#f1faf5;">
+            <strong style="color:#00733c;">Your Matrimony Profile ID / Nest ID</strong><br>
+            <span style="font-size:20px; font-weight:700; letter-spacing:1px;">{{ profile_id }}</span>
+          </div>
+          {% endif %}
+          <p style="margin:0 0 16px;">If admin approval is required for your profile, our team will review it and contact you when the review is complete.</p>
+          <p style="margin:0 0 24px;">Thank you for choosing Kerala Kakkaram Matrimony. We wish you the very best on your journey.</p>
+          <p style="margin:0;">Warm regards,<br><strong style="color:#00733c;">Kerala Kakkaram Matrimony</strong></p>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:16px 24px; text-align:center; background-color:#f7faf8; color:#718078; font-size:12px;">
+          Thank you for being part of our community.
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

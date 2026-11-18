@@ -314,7 +314,7 @@ export default function Home() {
       </div>
 
       <div className="features-section">
-        <h2 className="section-title3345" style={{ marginBottom: '1rem' }}>Why Choose KeralakaraMatrimony?</h2>
+        <h2 className="section-title3345" style={{ marginBottom: '1rem', textAlign: 'center' }}>Why Choose KeralakaraMatrimony?</h2>
         <p className="section-subtitle">We guarantee security and trusted matches for a lifelong commitment.</p>
         
         <div className="features-grid">

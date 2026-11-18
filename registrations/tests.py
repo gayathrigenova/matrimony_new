@@ -661,10 +661,22 @@ class RegistrationDuplicateValidationTests(TestCase):
         )
         self.assertIsNotNone(challenge.consumed_at)
         self.assertEqual(len(mail.outbox), 3)
-        self.assertEqual(mail.outbox[1].subject, "Your Matrimony registration is complete")
+        self.assertEqual(
+            mail.outbox[1].subject,
+            "Welcome to Kerala Kakkaram Matrimony!",
+        )
+        self.assertEqual(mail.outbox[1].from_email, "info@keralakkaramatrimony.com")
+        self.assertEqual(mail.outbox[1].to, ["new.user@example.com"])
         self.assertIn("New User", mail.outbox[1].body)
-        self.assertIn(registration.created_at.strftime("%B"), mail.outbox[1].body)
-        self.assertIn("pending admin verification", mail.outbox[1].body)
+        self.assertIn("registration was successful", mail.outbox[1].body)
+        self.assertIn(registration.matrimony_id, mail.outbox[1].body)
+        self.assertIn("If admin approval is required", mail.outbox[1].body)
+        self.assertEqual(len([
+            message for message in mail.outbox
+            if message.subject == "Welcome to Kerala Kakkaram Matrimony!"
+        ]), 1)
+        self.assertEqual(len(mail.outbox[1].alternatives), 1)
+        self.assertIn(registration.matrimony_id, mail.outbox[1].alternatives[0][0])
         self.assertEqual(mail.outbox[2].subject, "New Matrimony registration requires review")
         self.assertIn(f"/admin/view/{registration.pk}", mail.outbox[2].body)
 

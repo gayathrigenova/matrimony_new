@@ -127,23 +127,9 @@ export default function Navbar() {
         </NavLink>
       </div>
 
-      {/* Mobile: Search Icon (left of hamburger) */}
-      <button
-        type="button"
-        className="wn-mobile-search-icon"
-        aria-label="Search profiles"
-        aria-expanded={searchOpen}
-        onClick={() => {
-          setSearchOpen(!searchOpen);
-          setIsOpen(false);
-        }}
-      >
-        ⌕
-      </button>
-
       {/* Mobile Search Bar Dropdown */}
       {searchOpen && (
-        <div className="wn-mobile-search-bar">
+        <div id="mobile-profile-search" className="wn-mobile-search-bar">
           <form onSubmit={handleSearchSubmit}>
             <input
               type="text"
@@ -175,6 +161,21 @@ export default function Navbar() {
 
       {/* Center: Navigation Links */}
       <ul id="mobile-navigation" className={`wn-nav-links ${isOpen ? 'open' : ''}`}>
+        <li className="wn-mobile-search-item">
+          <button
+            type="button"
+            className="wn-mobile-search-icon"
+            aria-label="Search profiles"
+            aria-expanded={searchOpen}
+            aria-controls="mobile-profile-search"
+            onClick={() => {
+              setSearchOpen(!searchOpen);
+              setIsOpen(false);
+            }}
+          >
+            ⌕ Search profiles
+          </button>
+        </li>
         {pages.map((page) => (
           <li key={page.path}>
             <NavLink

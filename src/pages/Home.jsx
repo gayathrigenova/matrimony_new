@@ -338,7 +338,9 @@ export default function Home() {
           <Mail size={22} />
           <div>
             <h4>Support Request</h4>
-            <p>Raise a support ticket</p>
+            <a href="https://wa.me/917559080005" target="_blank" rel="noreferrer">
+              Raise a support ticket
+            </a>
           </div>
         </div>
 

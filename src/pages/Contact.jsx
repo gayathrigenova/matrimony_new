@@ -63,7 +63,13 @@ export default function Contact() {
           <div className="contact-info-card" key={c.title}>
             <div className="contact-info-icon">{c.icon}</div>
             <h3>{c.title}</h3>
-            {c.lines.map(l => <p key={l}>{l}</p>)}
+            {c.lines.map(l => (
+              <p key={l}>
+                {c.title === "Phone Support" ? <a href={`tel:${l.replace(/[^+\d]/g, "")}`}>{l}</a>
+                  : c.title === "Email Us" ? <a href={`mailto:${l}`}>{l}</a>
+                    : l}
+              </p>
+            ))}
           </div>
         ))}
       </div>

@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import './Contact.css';
 import contactImage from '../assets/img8.png';
 import { API_URL, readApiResponse } from '../api.js';
+import { Clock3, Mail, MapPin, Phone } from 'lucide-react';
 
 export default function Contact() {
   const [formData, setFormData] = useState({ name: '', email: '', phone: '', subject: '', message: '' });
@@ -55,13 +56,13 @@ export default function Contact() {
       {/* Info Cards */}
       <div className="contact-info-strip">
         {[
-          { icon: "📍", title: "Our Office", lines: ["westhill", "kozhikode Kerala "] },
-          { icon: "📞", title: "Phone Support", lines: ["+91 755 908 0005"] },
-          { icon: "✉️", title: "Email Us", lines: ["keralakkaramatrimony@gmail.com"] },
-          { icon: "⏰", title: "Working Hours", lines: ["Mon – Sat: 9:00 AM – 8:00 PM", "Sunday: 10:00 AM – 4:00 PM"] },
+          { icon: MapPin, title: "Our Office", lines: ["westhill", "kozhikode Kerala "] },
+          { icon: Phone, title: "Phone Support", lines: ["+91 755 908 0005"] },
+          { icon: Mail, title: "Email Us", lines: ["keralakkaramatrimony@gmail.com"] },
+          { icon: Clock3, title: "Working Hours", lines: ["Mon – Sat: 9:00 AM – 8:00 PM", "Sunday: 10:00 AM – 4:00 PM"] },
         ].map(c => (
           <div className="contact-info-card" key={c.title}>
-            <div className="contact-info-icon">{c.icon}</div>
+            <div className="contact-info-icon"><c.icon aria-hidden="true" size={30} strokeWidth={1.8} /></div>
             <h3>{c.title}</h3>
             {c.lines.map(l => (
               <p key={l}>

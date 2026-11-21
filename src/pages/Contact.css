@@ -120,6 +120,17 @@ background-repeat: no-repeat;
   transition: color 0.3s;
 }
 
+.contact-info-card p a,
+.contact-info-card p a:visited {
+  color: #000;
+  text-decoration: none;
+}
+
+.contact-info-card:hover p a,
+.contact-info-card:hover p a:visited {
+  color: #fff;
+}
+
 /* ===== MAIN SECTION ===== */
 .contact-main-section {
   display: grid;

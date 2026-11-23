@@ -663,7 +663,7 @@ class RegistrationDuplicateValidationTests(TestCase):
         self.assertEqual(len(mail.outbox), 3)
         self.assertEqual(
             mail.outbox[1].subject,
-            "Welcome to Kerala Kakkaram Matrimony!",
+            "Welcome to Keralakkara Matrimony!",
         )
         self.assertEqual(mail.outbox[1].from_email, "info@keralakkaramatrimony.com")
         self.assertEqual(mail.outbox[1].to, ["new.user@example.com"])
@@ -673,7 +673,7 @@ class RegistrationDuplicateValidationTests(TestCase):
         self.assertIn("If admin approval is required", mail.outbox[1].body)
         self.assertEqual(len([
             message for message in mail.outbox
-            if message.subject == "Welcome to Kerala Kakkaram Matrimony!"
+            if message.subject == "Welcome to Keralakkara Matrimony!"
         ]), 1)
         self.assertEqual(len(mail.outbox[1].alternatives), 1)
         self.assertIn(registration.matrimony_id, mail.outbox[1].alternatives[0][0])

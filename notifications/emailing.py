@@ -95,13 +95,13 @@ def notify_registration_completed(registration):
     )
     text_body = (
         f"Hello {full_name},\n\n"
-        "Welcome to Kerala Kakkaram Matrimony!\n\n"
+        "Welcome to Keralakkara Matrimony!\n\n"
         "Your registration was successful. Thank you for choosing Kerala "
-        "Kakkaram Matrimony.\n\n"
+        "Keralakkara Matrimony.\n\n"
         f"{profile_id_text}"
         "If admin approval is required for your profile, our team will review "
         "it and contact you when the review is complete.\n\n"
-        "Warm regards,\nKerala Kakkaram Matrimony"
+        "Warm regards,\nKeralakkara Matrimony"
     )
 
     try:
@@ -113,7 +113,7 @@ def notify_registration_completed(registration):
             },
         )
         email = EmailMultiAlternatives(
-            subject="Welcome to Kerala Kakkaram Matrimony!",
+            subject="Welcome to Keralakkara Matrimony!",
             body=text_body,
             from_email="info@keralakkaramatrimony.com",
             to=[registration.user.email],

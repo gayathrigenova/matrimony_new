@@ -228,6 +228,8 @@ class Registration(models.Model):
         unique=True,
     )
 
+    phone_verified = models.BooleanField(default=False)
+
     alternate_phone = models.CharField(
         max_length=20,
         blank=True

@@ -53,6 +53,7 @@ from notifications.emailing import notify_profile_update
 from .verification import (
     VerificationDeliveryError,
     send_email_otp,
+    send_interest_notification,
     send_mobile_otp,
 )
 
@@ -1785,6 +1786,17 @@ class SendInterestView(APIView):
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        # The profile's persisted verification flag is set only by the verified
+        # registration flow. Legacy profiles without that proof receive no SMS.
+        if profile.phone_verified and profile.phone:
+            try:
+                send_interest_notification(profile.phone)
+            except Exception:
+                logger.exception(
+                    "Interest SMS delivery failed for interest_id=%s.",
+                    interest.pk,
+                )
 
         return Response(
             {

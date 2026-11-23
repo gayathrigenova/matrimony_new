@@ -209,6 +209,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
                     challenge.consumed_at
                     or challenge.expires_at <= now
                     or not challenge.email_verified
+                    or not challenge.phone_verified
                     or challenge.email.lower() != email
                     or challenge.phone != validated_data.get("phone")
                 ):
@@ -225,7 +226,11 @@ class RegistrationSerializer(serializers.ModelSerializer):
                     full_name=validated_data.get("full_name", ""),
                     role=User.Role.CLIENT,
                 )
-                registration = Registration.objects.create(user=user, **validated_data)
+                registration = Registration.objects.create(
+                    user=user,
+                    phone_verified=True,
+                    **validated_data,
+                )
                 challenge.consumed_at = now
                 challenge.save(update_fields=["consumed_at"])
                 transaction.on_commit(

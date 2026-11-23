@@ -105,7 +105,7 @@ def _provider_error(provider, exc):
     ) from exc
 
 
-def _send_http_sms(phone, otp):
+def _send_http_sms(phone, message):
     missing = [
         name
         for name, value in (
@@ -126,10 +126,6 @@ def _send_http_sms(phone, otp):
             "SMS_API_URL must use HTTPS on Railway."
         )
 
-    message = (
-        f"Your Matrimony mobile verification code is {otp}. "
-        f"It expires in {max(1, settings.OTP_EXPIRY_SECONDS // 60)} minutes."
-    )
     payload = {"to": phone, "message": message}
     if settings.SMS_SENDER_ID:
         payload["sender"] = settings.SMS_SENDER_ID
@@ -163,7 +159,7 @@ def _twilio_phone(phone):
     return f"+{digits}"
 
 
-def _send_twilio_sms(phone, otp):
+def _send_twilio_sms(phone, message):
     missing = [
         name
         for name, value in (
@@ -179,10 +175,6 @@ def _send_twilio_sms(phone, otp):
             "variables: " + ", ".join(missing) + "."
         )
 
-    message = (
-        f"Your Matrimony mobile verification code is {otp}. "
-        f"It expires in {max(1, settings.OTP_EXPIRY_SECONDS // 60)} minutes."
-    )
     url = (
         "https://api.twilio.com/2010-04-01/Accounts/"
         f"{settings.TWILIO_ACCOUNT_SID}/Messages.json"
@@ -210,10 +202,14 @@ def _send_twilio_sms(phone, otp):
 
 
 def send_mobile_otp(phone, otp):
+    message = (
+        f"Your Matrimony mobile verification code is {otp}. "
+        f"It expires in {max(1, settings.OTP_EXPIRY_SECONDS // 60)} minutes."
+    )
     if settings.SMS_PROVIDER == "http":
-        return _send_http_sms(phone, otp)
+        return _send_http_sms(phone, message)
     if settings.SMS_PROVIDER == "twilio":
-        return _send_twilio_sms(phone, otp)
+        return _send_twilio_sms(phone, message)
     if (
         settings.DEBUG
         and settings.MOBILE_OTP_MODE == "console"
@@ -236,3 +232,27 @@ def send_mobile_otp(phone, otp):
         f"Real mobile SMS delivery is unavailable. {provider_note} Configure "
         "SMS_PROVIDER and its required credentials."
     )
+
+
+def send_interest_notification(phone):
+    """Send a privacy-safe notification for a newly created profile interest."""
+    digits = re.sub(r"\D", "", phone or "")
+    country_code = re.sub(r"\D", "", settings.SMS_DEFAULT_COUNTRY_CODE)
+    if len(digits) == 10 and country_code:
+        digits = country_code + digits
+    if not 8 <= len(digits) <= 15 or digits.startswith("0"):
+        logger.warning("Interest SMS skipped because the recipient number is invalid.")
+        return False
+
+    message = (
+        "Hello, someone is interested in your profile on Kerala Karam Matrimony. "
+        "Login to your account to view the interest."
+    )
+    if settings.SMS_PROVIDER == "http":
+        _send_http_sms(f"+{digits}", message)
+    elif settings.SMS_PROVIDER == "twilio":
+        _send_twilio_sms(f"+{digits}", message)
+    else:
+        logger.info("Interest SMS skipped because no SMS provider is enabled.")
+        return False
+    return True

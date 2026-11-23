@@ -46,6 +46,10 @@ applies migrations and starts Gunicorn. Set:
   and registration remains blocked. `SMS_PROVIDER=disabled` does not send SMS.
   `MOBILE_OTP_MODE=console` is development-only, writes a code to backend logs,
   and is not SMS delivery.
+- The same SMS provider configuration sends a privacy-safe notification when
+  a new interest is saved. Notifications are sent only to published profiles
+  whose mobile number was verified during registration. Existing profiles are
+  treated as unverified until verified through the registration workflow.
 
 Keep `DEBUG` false in production. This repository is deployed from its root:
 Railway builds and starts `manage.py` and `config.wsgi` from that service root.

@@ -156,17 +156,25 @@ export default function RegistrationStep3() {
       // =========================
       if (!response.ok) {
         if (result.verification_token) {
-          const registrationWithoutToken = { ...registration };
-          delete registrationWithoutToken.verification_token;
-          navigate("/registration", {
-            state: {
-              registration: registrationWithoutToken,
-              step1FormData: location.state?.step1FormData,
-              step2FormData: location.state?.step2FormData,
-              step3FormData: formData,
-              verificationExpired: true,
-            },
-          });
+          const verificationError = Array.isArray(result.verification_token)
+            ? result.verification_token.join(" ")
+            : String(result.verification_token);
+          if (/expired/i.test(verificationError)) {
+            const registrationWithoutToken = { ...registration };
+            delete registrationWithoutToken.verification_token;
+            navigate("/registration", {
+              state: {
+                registration: registrationWithoutToken,
+                step1FormData: location.state?.step1FormData,
+                step2FormData: location.state?.step2FormData,
+                step3FormData: formData,
+                verificationExpired: true,
+              },
+            });
+            return;
+          }
+
+          alert(verificationError);
           return;
         }
 

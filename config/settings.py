@@ -344,9 +344,18 @@ else:
 OTP_EXPIRY_SECONDS = int(os.getenv("OTP_EXPIRY_SECONDS", "300"))
 OTP_RESEND_COOLDOWN_SECONDS = int(os.getenv("OTP_RESEND_COOLDOWN_SECONDS", "60"))
 OTP_MAX_ATTEMPTS = int(os.getenv("OTP_MAX_ATTEMPTS", "5"))
-if min(OTP_EXPIRY_SECONDS, OTP_RESEND_COOLDOWN_SECONDS, OTP_MAX_ATTEMPTS) <= 0:
+REGISTRATION_COMPLETION_TOKEN_SECONDS = int(
+    os.getenv("REGISTRATION_COMPLETION_TOKEN_SECONDS", "1800")
+)
+if min(
+    OTP_EXPIRY_SECONDS,
+    OTP_RESEND_COOLDOWN_SECONDS,
+    OTP_MAX_ATTEMPTS,
+    REGISTRATION_COMPLETION_TOKEN_SECONDS,
+) <= 0:
     raise ImproperlyConfigured(
-        "OTP expiry, resend cooldown, and attempt limit must be positive integers."
+        "OTP expiry, resend cooldown, attempt limit, and registration completion "
+        "token lifetime must be positive integers."
     )
 
 SMS_PROVIDER = os.getenv("SMS_PROVIDER", "").strip().lower()

@@ -34,7 +34,8 @@ applies migrations and starts Gunicorn. Set:
 - `RAZORPAY_WEBHOOK_SECRET`: secret configured for the Razorpay webhook below.
 - `OTP_EXPIRY_SECONDS` (default `300`), `OTP_RESEND_COOLDOWN_SECONDS`
   (default `60`), and `OTP_MAX_ATTEMPTS` (default `5`): positive integer OTP
-  policy values.
+  policy values. `REGISTRATION_COMPLETION_TOKEN_SECONDS` defaults to `1800`
+  and sets the bounded time to finish registration after email verification.
 - SMS delivery must use a real provider. For Twilio, set
   `SMS_PROVIDER=twilio`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and
   `TWILIO_FROM_NUMBER`. For a compatible HTTP SMS API, set `SMS_PROVIDER=http`,

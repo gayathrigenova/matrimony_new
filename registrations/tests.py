@@ -8,6 +8,7 @@ from unittest.mock import Mock, patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password
+from django.conf import settings
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
 from anymail.exceptions import AnymailError
@@ -565,6 +566,18 @@ class RegistrationDuplicateValidationTests(TestCase):
         self.assertTrue(verified.data["email_verified"])
         self.assertFalse(verified.data["mobile_verified"])
 
+        challenge.refresh_from_db()
+        self.assertGreater(
+            challenge.expires_at,
+            timezone.now() + timedelta(
+                seconds=settings.REGISTRATION_COMPLETION_TOKEN_SECONDS - 5
+            ),
+        )
+        # The OTP itself may expire while the user fills in the remaining
+        # registration steps; the verified completion token remains bounded.
+        challenge.email_expires_at = timezone.now() - timedelta(seconds=1)
+        challenge.save(update_fields=["email_expires_at"])
+
         with self.captureOnCommitCallbacks(execute=True):
             registration_response = self.client.post(
                 "/api/registrations/",
@@ -728,6 +741,39 @@ class RegistrationDuplicateValidationTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("verification_token", response.data)
         self.assertFalse(User.objects.filter(email="pending@example.com").exists())
+
+    def test_registration_rejects_expired_verified_challenge(self):
+        now = timezone.now()
+        challenge = VerificationChallenge.objects.create(
+            email="expired@example.com",
+            phone="9123456780",
+            email_otp_hash="not-used",
+            phone_otp_hash="not-used",
+            email_verified=True,
+            email_resend_after=now,
+            phone_resend_after=now,
+            email_expires_at=now - timedelta(seconds=1),
+            phone_expires_at=now - timedelta(seconds=1),
+            expires_at=now - timedelta(seconds=1),
+        )
+
+        response = self.client.post(
+            "/api/registrations/",
+            {
+                "full_name": "Expired User",
+                "gender": "Male",
+                "date_of_birth": "1994-01-01",
+                "email": "expired@example.com",
+                "password": "pass123",
+                "phone": "9123456780",
+                "verification_token": str(challenge.pk),
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("expired", response.data["verification_token"][0].lower())
+        self.assertFalse(User.objects.filter(email="expired@example.com").exists())
 
     def test_registration_verification_token_is_bound_to_both_contacts(self):
         now = timezone.now()

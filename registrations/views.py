@@ -714,7 +714,18 @@ class VerificationCodeView(APIView):
                     )
 
                 setattr(challenge, verified_field, True)
-                challenge.save(update_fields=[verified_field])
+                update_fields = [verified_field]
+                if field_channel == "email":
+                    # OTPs expire quickly, but successful email verification
+                    # grants a separate bounded window to finish the long form.
+                    challenge.expires_at = max(
+                        challenge.expires_at,
+                        now + timedelta(
+                            seconds=settings.REGISTRATION_COMPLETION_TOKEN_SECONDS
+                        ),
+                    )
+                    update_fields.append("expires_at")
+                challenge.save(update_fields=update_fields)
                 data = {
                     "email_verified": challenge.email_verified,
                     "mobile_verified": challenge.phone_verified,

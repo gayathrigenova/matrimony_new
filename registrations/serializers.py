@@ -208,15 +208,31 @@ class RegistrationSerializer(serializers.ModelSerializer):
                 if (
                     challenge.consumed_at
                     or challenge.expires_at <= now
-                    or not challenge.email_verified
-                    or not challenge.phone_verified
-                    or challenge.email.lower() != email
-                    or challenge.phone != validated_data.get("phone")
                 ):
+                    raise serializers.ValidationError({
+                        "verification_token": (
+                            "Email verification expired before registration was "
+                            "submitted. Verify your email again."
+                        )
+                    })
+                if not challenge.email_verified:
                     raise serializers.ValidationError({
                         "verification_token": (
                             "Verify the submitted email address before completing "
                             "registration."
+                        )
+                    })
+                if challenge.email.lower() != email:
+                    raise serializers.ValidationError({
+                        "verification_token": (
+                            "The submitted email does not match the verified email."
+                        )
+                    })
+                if challenge.phone != validated_data.get("phone"):
+                    raise serializers.ValidationError({
+                        "verification_token": (
+                            "The submitted mobile number does not match the "
+                            "verification request."
                         )
                     })
 
@@ -228,7 +244,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
                 )
                 registration = Registration.objects.create(
                     user=user,
-                    phone_verified=True,
+                    phone_verified=challenge.phone_verified,
                     **validated_data,
                 )
                 challenge.consumed_at = now

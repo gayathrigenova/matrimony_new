@@ -751,6 +751,10 @@ class ProfileReviewWorkflowTests(TestCase):
             self.assertEqual(published.status_code, 200)
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].subject, "Your Matrimony Profile Has Been Approved")
+        self.assertIn(
+            "https://keralakkaramatrimony.com/login",
+            mail.outbox[0].body,
+        )
         self.assertEqual(
             self.admin_api.post(f"/api/adminpanel/registrations/{self.registration.pk}/approve/").status_code,
             200,

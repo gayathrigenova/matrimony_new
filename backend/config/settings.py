@@ -15,6 +15,11 @@ SECRET_KEY = os.getenv(
 
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 
+FRONTEND_URL = os.getenv(
+    "FRONTEND_URL",
+    "https://keralakkaramatrimony.com",
+).strip().rstrip("/")
+
 ALLOWED_HOSTS = [
     "matrimonynew-production.up.railway.app",
     "localhost",
@@ -243,7 +248,7 @@ REST_FRAMEWORK = {
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://matrimony-sepia-phi.vercel.app",
+    FRONTEND_URL,
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -274,7 +279,7 @@ CORS_ALLOW_HEADERS = [
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://matrimony-sepia-phi.vercel.app",
+    FRONTEND_URL,
     "https://matrimonynew-production.up.railway.app",
 ]
 

@@ -24,10 +24,10 @@ applies migrations and starts Gunicorn. Set:
   `EMAIL_TIMEOUT` sets the SMTP connection timeout (default `10`). Keep
   credentials only in Railway variables.
 - `ADMIN_NOTIFICATION_EMAIL`: destination for profile review notices.
-- `ADMIN_DASHBOARD_URL`: frontend origin used for admin review links.
 - `FRONTEND_URL`: frontend origin used in client emails and password-reset
-  links. Password-reset links expire after 30 minutes. No additional
-  password-reset environment variables are required.
+  links (defaults to `https://keralakkaramatrimony.com`). Set this to the
+  production frontend origin. Password-reset links expire after 30 minutes.
+  No additional password-reset environment variables are required.
 - `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`: Razorpay API credentials for
   creating membership orders and confirming captured payments. Keep the secret
   only in Railway variables.

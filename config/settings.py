@@ -24,6 +24,11 @@ ALLOWED_HOSTS = [
     ).split(",") if host.strip()
 ]
 
+FRONTEND_URL = os.getenv(
+    "FRONTEND_URL",
+    "https://keralakkaramatrimony.com",
+).strip().rstrip("/")
+
 
 # =========================================================
 # APPLICATIONS
@@ -252,7 +257,7 @@ REST_FRAMEWORK = {
 CORS_ALLOWED_ORIGINS = [
     origin.strip().rstrip("/") for origin in os.getenv(
         "CORS_ALLOWED_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,https://matrimony-sepia-phi.vercel.app",
+        f"http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,{FRONTEND_URL}",
     ).split(",") if origin.strip()
 ]
 if "http://localhost:5174" not in CORS_ALLOWED_ORIGINS:
@@ -286,7 +291,7 @@ CORS_ALLOW_HEADERS = [
 CSRF_TRUSTED_ORIGINS = [
     origin.strip().rstrip("/") for origin in os.getenv(
         "CSRF_TRUSTED_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173,https://matrimony-sepia-phi.vercel.app,https://matrimonynew-production.up.railway.app,https://keralakkaramatrimony.com,https://www.keralakkaramatrimony.com",
+        f"http://localhost:5173,http://127.0.0.1:5173,https://matrimonynew-production.up.railway.app,{FRONTEND_URL},https://www.keralakkaramatrimony.com",
     ).split(",") if origin.strip()
 ]
 

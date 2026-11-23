@@ -96,7 +96,7 @@ def notify_registration_completed(registration):
     text_body = (
         f"Hello {full_name},\n\n"
         "Welcome to Keralakkara Matrimony!\n\n"
-        "Your registration was successful. Thank you for choosing Kerala "
+        "Your registration was successful. Thank you for choosing "
         "Keralakkara Matrimony.\n\n"
         f"{profile_id_text}"
         "If admin approval is required for your profile, our team will review "
@@ -138,7 +138,7 @@ def notify_registration_completed(registration):
 
 def notify_admin_new_registration(registration):
     recipient = os.getenv("ADMIN_NOTIFICATION_EMAIL", "").strip()
-    dashboard_url = os.getenv("ADMIN_DASHBOARD_URL", "").rstrip("/")
+    dashboard_url = settings.FRONTEND_URL
     link = f"{dashboard_url}/admin/view/{registration.pk}" if dashboard_url else ""
     body = (
         f"New registration ready for admin review.\n"
@@ -154,7 +154,7 @@ def notify_admin_new_registration(registration):
 
 def notify_admin_profile_change(registration, changed_fields=None):
     recipient = os.getenv("ADMIN_NOTIFICATION_EMAIL", "").strip()
-    dashboard_url = os.getenv("ADMIN_DASHBOARD_URL", "").rstrip("/")
+    dashboard_url = settings.FRONTEND_URL
     link = f"{dashboard_url}/admin/view/{registration.pk}" if dashboard_url else ""
     if changed_fields is None:
         change = registration.profile_changes.filter(
@@ -177,9 +177,7 @@ def notify_admin_profile_change(registration, changed_fields=None):
 
 
 def notify_client_profile_update(registration, changed_fields):
-    dashboard_url = os.getenv(
-        "FRONTEND_URL", "https://matrimony-sepia-phi.vercel.app"
-    ).rstrip("/")
+    dashboard_url = settings.FRONTEND_URL
     send_profile_email(
         "Your Matrimony profile has been updated",
         (
@@ -200,7 +198,7 @@ def notify_profile_update(registration, changed_fields):
 
 
 def notify_client_approval(registration, updated=False):
-    dashboard_url = os.getenv("FRONTEND_URL", "https://matrimony-sepia-phi.vercel.app").rstrip("/")
+    dashboard_url = settings.FRONTEND_URL
     subject = (
         "Your Updated Matrimony Profile Has Been Approved"
         if updated else "Your Matrimony Profile Has Been Approved"
@@ -223,7 +221,5 @@ def notify_client_decision(registration, status_label, message=""):
     text = f"Your Matrimony profile status is now {status_label}."
     if message:
         text += f"\n\nAdmin message: {message}"
-    text += "\n\nPlease log in to review your profile: " + os.getenv(
-        "FRONTEND_URL", "https://matrimony-sepia-phi.vercel.app"
-    ).rstrip("/") + "/login"
+    text += "\n\nPlease log in to review your profile: " + settings.FRONTEND_URL + "/login"
     send_profile_email("Update about your Matrimony profile", text, registration.user.email)

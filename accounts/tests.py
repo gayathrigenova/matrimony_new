@@ -256,6 +256,7 @@ class AccountDeletionTests(TestCase):
 @override_settings(
     EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
     DEFAULT_FROM_EMAIL="no-reply@example.com",
+    FRONTEND_URL="https://keralakkaramatrimony.com",
 )
 class PasswordResetTests(TestCase):
     def setUp(self):
@@ -287,6 +288,11 @@ class PasswordResetTests(TestCase):
             html_body,
         )
         self.assertIsNotNone(match)
+        self.assertTrue(
+            match.group(1).startswith(
+                "https://keralakkaramatrimony.com/reset-password/"
+            )
+        )
         return match.group(2), match.group(3)
 
     def test_request_response_does_not_disclose_account_existence(self):

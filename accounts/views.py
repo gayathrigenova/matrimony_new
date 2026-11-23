@@ -1,6 +1,5 @@
 import hashlib
 import logging
-import os
 import smtplib
 from urllib.parse import urljoin
 
@@ -137,10 +136,7 @@ class PasswordResetRequestView(APIView):
             raw_token = PasswordResetToken.generate_for_user(user)
             token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
             uid = urlsafe_base64_encode(force_str(user.pk).encode())
-            frontend_url = (
-                os.getenv("FRONTEND_URL", "").strip().rstrip("/")
-                or "https://matrimony-sepia-phi.vercel.app"
-            )
+            frontend_url = settings.FRONTEND_URL
             reset_url = urljoin(
                 f"{frontend_url}/",
                 f"reset-password/{uid}/{raw_token}",

@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
@@ -247,6 +248,15 @@ REST_FRAMEWORK = {
         "password_reset": "5/hour",
         "password_reset_confirm": "10/hour",
     },
+}
+
+# Keep access tokens short lived, while giving active admins enough time to
+# work without repeated login interruptions. Refresh tokens remain finite.
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": False,
+    "BLACKLIST_AFTER_ROTATION": False,
 }
 
 

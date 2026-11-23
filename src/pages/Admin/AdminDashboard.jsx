@@ -78,21 +78,12 @@ export default function AdminDashboard() {
       // =================================================
 
       if (response.status === 401) {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
-
-        navigate("/admin/login");
+        // fetchWithTokenRefresh already redirects when refresh authentication
+        // fails. Keep the current page state for other 401 causes.
         return;
       }
 
       if (!response.ok) {
-        if (response.status === 403) {
-          localStorage.removeItem("access_token");
-          localStorage.removeItem("refresh_token");
-          localStorage.removeItem("user");
-          localStorage.removeItem("admin_user");
-          navigate("/admin/login", { replace: true });
-        }
         throw new Error(
           data?.detail ||
             data?.message ||
@@ -267,13 +258,6 @@ export default function AdminDashboard() {
       const data = await readApiResponse(response);
 
       if (!response.ok) {
-        if (response.status === 403) {
-          localStorage.removeItem("access_token");
-          localStorage.removeItem("refresh_token");
-          localStorage.removeItem("user");
-          localStorage.removeItem("admin_user");
-          navigate("/admin/login", { replace: true });
-        }
         throw new Error(data.detail || "Unable to delete this profile.");
       }
 

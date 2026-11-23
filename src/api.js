@@ -54,14 +54,22 @@ export async function fetchWithTokenRefresh(url, options = {}) {
     });
     const refreshed = await readApiResponse(refreshResponse);
     if (!refreshResponse.ok || !refreshed?.access) {
+      // A transient server failure does not make the stored refresh token
+      // invalid. Preserve the session so the admin can retry.
+      if (refreshResponse.status >= 500) return response;
       clearAuthentication(authRedirect);
       return response;
     }
 
     localStorage.setItem("access_token", refreshed.access);
-    return sendRequest(refreshed.access);
+    const retriedResponse = await sendRequest(refreshed.access);
+    if (retriedResponse.status === 401) {
+      clearAuthentication(authRedirect);
+    }
+    return retriedResponse;
   } catch (error) {
-    clearAuthentication(authRedirect);
+    // Preserve credentials during network failures; only a rejected refresh
+    // token should end the session.
     throw error;
   }
 }

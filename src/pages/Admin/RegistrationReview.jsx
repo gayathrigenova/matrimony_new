@@ -59,14 +59,6 @@ const CHANGE_FIELD_LABELS = {
   gallery_photo: "Gallery Photo",
 };
 
-function clearAdminSession() {
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("refresh_token");
-  localStorage.removeItem("admin_user");
-  localStorage.removeItem("user");
-  window.dispatchEvent(new Event("auth-change"));
-}
-
 export default function RegistrationReview() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -99,21 +91,13 @@ export default function RegistrationReview() {
       );
 
       if (response.status === 401) {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
-        localStorage.removeItem("admin_user");
-
-        navigate("/admin/login");
+        // The shared refresh handler owns invalid-session cleanup.
         return;
       }
 
       const data = await readApiResponse(response);
 
       if (!response.ok) {
-        if (response.status === 403) {
-          clearAdminSession();
-          navigate("/admin/login", { replace: true });
-        }
         console.error("Fetch Error:", data);
         alert(data.detail || "Unable to load registration details.");
         return;
@@ -194,21 +178,13 @@ export default function RegistrationReview() {
       });
 
       if (response.status === 401) {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
-        localStorage.removeItem("admin_user");
-
-        navigate("/admin/login");
+        // The shared refresh handler owns invalid-session cleanup.
         return;
       }
 
       const data = await readApiResponse(response);
 
       if (!response.ok) {
-        if (response.status === 403) {
-          clearAdminSession();
-          navigate("/admin/login", { replace: true });
-        }
         console.error("Action Error:", data);
 
         alert(

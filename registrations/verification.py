@@ -1,8 +1,10 @@
 import logging
 import base64
+import hashlib
 import json
 import re
 import smtplib
+from datetime import datetime, timezone as datetime_timezone
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -149,6 +151,67 @@ def _send_http_sms(phone, message):
     return "sent"
 
 
+def _genova_auth_signature(access_token, access_token_key, expire):
+    time_key = hashlib.md5(
+        ("send-sms" + "sms@rits-v1.0" + str(expire)).encode("utf-8")
+    ).hexdigest()
+    time_access_token_key = hashlib.md5(
+        f"{access_token}{time_key}".encode("utf-8")
+    ).hexdigest()
+    return hashlib.md5(
+        f"{time_access_token_key}{access_token_key}".encode("utf-8")
+    ).hexdigest()
+
+
+def _send_genova_registration_otp(phone, otp):
+    access_token = settings.GENOVA_SMS_ACCESS_TOKEN
+    access_token_key = settings.GENOVA_SMS_ACCESS_TOKEN_KEY
+    if not access_token or not access_token_key:
+        missing = []
+        if not access_token:
+            missing.append("SMS_ACCESS_TOKEN")
+        if not access_token_key:
+            missing.append("SMS_ACCESS_TOKEN_KEY")
+        raise VerificationDeliveryError(
+            "SMS delivery is not configured. Set these Railway variables: "
+            + ", ".join(missing)
+            + "."
+        )
+
+    expire = int(datetime.now(datetime_timezone.utc).timestamp())
+    signature = _genova_auth_signature(access_token, access_token_key, expire)
+    message = (
+        "Your Keralakkara Matrimony registration OTP is "
+        f"{otp}. Valid for 10 minutes. Do not share this OTP with anyone."
+    )
+    payload = {
+        "RequestFor": "send-sms",
+        "accessToken": access_token,
+        "expire": expire,
+        "authSignature": signature,
+        "route": settings.GENOVA_SMS_ROUTE,
+        "smsHeader": settings.GENOVA_SMS_HEADER,
+        "entityId": settings.GENOVA_SMS_ENTITY_ID,
+        "templateId": settings.GENOVA_OTP_TEMPLATE_ID,
+        "contentType": settings.GENOVA_SMS_CONTENT_TYPE,
+        "recipients": phone,
+        "message": message,
+    }
+    request = Request(
+        settings.GENOVA_SMS_API_URL,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=settings.SMS_TIMEOUT) as response:
+            if not 200 <= response.status < 300:
+                raise OSError(f"Unexpected provider status {response.status}")
+    except (HTTPError, URLError, OSError, ValueError) as exc:
+        _provider_error("genova", exc)
+    return "sent"
+
+
 def _twilio_phone(phone):
     digits = re.sub(r"\D", "", phone)
     if phone.strip().startswith("+"):
@@ -202,36 +265,7 @@ def _send_twilio_sms(phone, message):
 
 
 def send_mobile_otp(phone, otp):
-    message = (
-        f"Your Matrimony mobile verification code is {otp}. "
-        f"It expires in {max(1, settings.OTP_EXPIRY_SECONDS // 60)} minutes."
-    )
-    if settings.SMS_PROVIDER == "http":
-        return _send_http_sms(phone, message)
-    if settings.SMS_PROVIDER == "twilio":
-        return _send_twilio_sms(phone, message)
-    if (
-        settings.DEBUG
-        and settings.MOBILE_OTP_MODE == "console"
-        and settings.SMS_PROVIDER in ("", "disabled")
-    ):
-        logger.warning(
-            "Development mobile verification code for phone ending in %s: %s",
-            phone[-4:],
-            otp,
-        )
-        return "development_console"
-
-    provider_note = (
-        "The configured SMS provider is unavailable."
-        if settings.SMS_PROVIDER == "disabled"
-        else "No SMS provider is configured."
-    )
-    logger.error("Mobile verification unavailable: %s", provider_note)
-    raise VerificationDeliveryError(
-        f"Real mobile SMS delivery is unavailable. {provider_note} Configure "
-        "SMS_PROVIDER and its required credentials."
-    )
+    return _send_genova_registration_otp(phone, otp)
 
 
 def send_interest_notification(phone):

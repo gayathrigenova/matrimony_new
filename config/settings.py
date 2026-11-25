@@ -351,7 +351,7 @@ if RESEND_API_KEY:
 else:
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
-OTP_EXPIRY_SECONDS = int(os.getenv("OTP_EXPIRY_SECONDS", "300"))
+OTP_EXPIRY_SECONDS = int(os.getenv("OTP_EXPIRY_SECONDS", "600"))
 OTP_RESEND_COOLDOWN_SECONDS = int(os.getenv("OTP_RESEND_COOLDOWN_SECONDS", "60"))
 OTP_MAX_ATTEMPTS = int(os.getenv("OTP_MAX_ATTEMPTS", "5"))
 REGISTRATION_COMPLETION_TOKEN_SECONDS = int(
@@ -380,6 +380,16 @@ SMS_API_KEY_PREFIX = os.getenv("SMS_API_KEY_PREFIX", "Bearer").strip()
 SMS_SENDER_ID = os.getenv("SMS_SENDER_ID", "").strip()
 SMS_TIMEOUT = int(os.getenv("SMS_TIMEOUT", "10"))
 SMS_DEFAULT_COUNTRY_CODE = os.getenv("SMS_DEFAULT_COUNTRY_CODE", "+91").strip()
+# Genova Technologies registration OTP configuration. Credentials remain
+# backend-only and are read exclusively from Railway environment variables.
+GENOVA_SMS_API_URL = "https://sms.genovatechnologies.com/api/sms/v1.0/send-sms"
+GENOVA_SMS_ACCESS_TOKEN = os.getenv("SMS_ACCESS_TOKEN", "").strip()
+GENOVA_SMS_ACCESS_TOKEN_KEY = os.getenv("SMS_ACCESS_TOKEN_KEY", "").strip()
+GENOVA_SMS_ROUTE = "transactional"
+GENOVA_SMS_HEADER = "KRLMTY"
+GENOVA_SMS_ENTITY_ID = "1701173856253719483"
+GENOVA_OTP_TEMPLATE_ID = "1777179500154552461"
+GENOVA_SMS_CONTENT_TYPE = "text"
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID", "").strip()
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
 TWILIO_FROM_NUMBER = os.getenv("TWILIO_FROM_NUMBER", "").strip()

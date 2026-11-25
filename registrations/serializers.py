@@ -222,6 +222,13 @@ class RegistrationSerializer(serializers.ModelSerializer):
                             "registration."
                         )
                     })
+                if not challenge.phone_verified:
+                    raise serializers.ValidationError({
+                        "verification_token": (
+                            "Verify the submitted mobile number before completing "
+                            "registration."
+                        )
+                    })
                 if challenge.email.lower() != email:
                     raise serializers.ValidationError({
                         "verification_token": (

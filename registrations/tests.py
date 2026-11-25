@@ -517,8 +517,8 @@ class RegistrationDuplicateValidationTests(TestCase):
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
         DEFAULT_FROM_EMAIL="no-reply@example.com",
     )
-    @patch("registrations.views.send_mobile_otp")
-    def test_email_resend_and_verification_allow_registration_without_sms(
+    @patch("registrations.views.send_mobile_otp", return_value="sent")
+    def test_email_resend_and_verification_do_not_allow_registration_without_sms(
         self, send_sms
     ):
         email = "email-only-registration@example.com"
@@ -592,12 +592,9 @@ class RegistrationDuplicateValidationTests(TestCase):
                 },
                 format="json",
             )
-        self.assertEqual(registration_response.status_code, 201, registration_response.data)
-        self.assertTrue(User.objects.filter(email=email).exists())
-        self.assertEqual(
-            Registration.objects.get(user__email=email).phone,
-            phone,
-        )
+        self.assertEqual(registration_response.status_code, 400, registration_response.data)
+        self.assertIn("mobile number", str(registration_response.data["verification_token"]).lower())
+        self.assertFalse(User.objects.filter(email=email).exists())
         send_sms.assert_not_called()
 
     @override_settings(
@@ -607,7 +604,7 @@ class RegistrationDuplicateValidationTests(TestCase):
         ADMIN_DASHBOARD_URL="https://matrimony.example.com",
     )
     def test_new_email_and_phone_are_accepted_and_email_is_normalized(self):
-        with patch("registrations.views.send_mobile_otp") as send_sms:
+        with patch("registrations.views.send_mobile_otp", return_value="sent") as send_sms:
             start = self.client.post(
                 "/api/registrations/verification/start/",
                 {"email": "New.User@Example.com", "phone": "9123456780"},
@@ -772,7 +769,7 @@ class RegistrationDuplicateValidationTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("expired", response.data["verification_token"][0].lower())
+        self.assertIn("expired", str(response.data["verification_token"]).lower())
         self.assertFalse(User.objects.filter(email="expired@example.com").exists())
 
     def test_registration_verification_token_is_bound_to_both_contacts(self):
@@ -821,7 +818,7 @@ class RegistrationDuplicateValidationTests(TestCase):
         DEFAULT_FROM_EMAIL="no-reply@example.com",
         OTP_MAX_ATTEMPTS=2,
     )
-    @patch("registrations.views.send_mobile_otp")
+    @patch("registrations.views.send_mobile_otp", return_value="sent")
     def test_otp_is_hashed_attempts_are_limited_and_codes_are_not_returned(self, send_sms):
         start = self.client.post(
             "/api/registrations/verification/start/",
@@ -899,7 +896,7 @@ class RegistrationDuplicateValidationTests(TestCase):
         DEFAULT_FROM_EMAIL="no-reply@example.com",
         OTP_RESEND_COOLDOWN_SECONDS=60,
     )
-    @patch("registrations.views.send_mobile_otp")
+    @patch("registrations.views.send_mobile_otp", return_value="sent")
     def test_resend_obeys_cooldown_and_rotates_the_otp(self, send_sms):
         start = self.client.post(
             "/api/registrations/verification/start/",
@@ -935,7 +932,7 @@ class RegistrationDuplicateValidationTests(TestCase):
         DEFAULT_FROM_EMAIL="no-reply@example.com",
     )
     @patch("registrations.views._new_otp", side_effect=["111111", "222222", "333333"])
-    @patch("registrations.views.send_mobile_otp")
+    @patch("registrations.views.send_mobile_otp", return_value="sent")
     def test_email_resend_invalidates_the_old_code_and_accepts_the_new_code(
         self, send_sms, _new_otp
     ):
@@ -986,29 +983,27 @@ class RegistrationDuplicateValidationTests(TestCase):
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
         DEFAULT_FROM_EMAIL="no-reply@example.com",
     )
+    @patch("registrations.views.send_mobile_otp", return_value="sent")
     @patch("registrations.views._new_otp", side_effect=["111111", "222222", "333333"])
     def test_mobile_resend_invalidates_the_old_code_and_accepts_the_new_code(
-        self, _new_otp
+        self, _new_otp, send_sms
     ):
-        with self.assertLogs("registrations.verification", level="WARNING") as logs:
-            start = self.client.post(
-                "/api/registrations/verification/start/",
-                {"email": "mobile-resend@example.com", "phone": "9123456780"},
-                format="json",
-            )
-        self.assertIn("222222", "\n".join(logs.output))
+        start = self.client.post(
+            "/api/registrations/verification/start/",
+            {"email": "mobile-resend@example.com", "phone": "9123456780"},
+            format="json",
+        )
+        self.assertEqual(start.status_code, 200, start.data)
         challenge = VerificationChallenge.objects.get(pk=start.data["challenge_id"])
         challenge.phone_resend_after = timezone.now() - timedelta(seconds=1)
         challenge.save(update_fields=["phone_resend_after"])
 
-        with self.assertLogs("registrations.verification", level="WARNING") as logs:
-            resent = self.client.post(
-                "/api/registrations/verification/resend/",
-                {"challenge_id": start.data["challenge_id"], "channel": "mobile"},
-                format="json",
-            )
+        resent = self.client.post(
+            "/api/registrations/verification/resend/",
+            {"challenge_id": start.data["challenge_id"], "channel": "mobile"},
+            format="json",
+        )
         self.assertEqual(resent.status_code, 200, resent.data)
-        self.assertIn("333333", "\n".join(logs.output))
         self.assertNotIn("333333", json.dumps(resent.data))
 
         old_code = self.client.post(
@@ -1035,13 +1030,14 @@ class RegistrationDuplicateValidationTests(TestCase):
         self.assertEqual(old_code.status_code, 400)
         self.assertEqual(new_code.status_code, 200, new_code.data)
         self.assertNotIn("333333", json.dumps(resent.data))
+        self.assertEqual(send_sms.call_count, 2)
 
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
         DEFAULT_FROM_EMAIL="no-reply@example.com",
         OTP_RESEND_COOLDOWN_SECONDS=60,
     )
-    @patch("registrations.views.send_mobile_otp")
+    @patch("registrations.views.send_mobile_otp", return_value="sent")
     @patch("registrations.views.send_email_otp")
     def test_resend_delivery_failure_preserves_code_and_enforces_cooldown(
         self, send_email, send_sms
@@ -1078,7 +1074,7 @@ class RegistrationDuplicateValidationTests(TestCase):
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
         DEFAULT_FROM_EMAIL="no-reply@example.com",
     )
-    @patch("registrations.views.send_mobile_otp")
+    @patch("registrations.views.send_mobile_otp", return_value="sent")
     def test_resend_rejects_an_expired_challenge(self, send_sms):
         start = self.client.post(
             "/api/registrations/verification/start/",
@@ -1086,8 +1082,11 @@ class RegistrationDuplicateValidationTests(TestCase):
             format="json",
         )
         challenge = VerificationChallenge.objects.get(pk=start.data["challenge_id"])
-        challenge.expires_at = timezone.now() - timedelta(seconds=1)
-        challenge.save(update_fields=["expires_at"])
+        expired_at = timezone.now() - timedelta(seconds=1)
+        challenge.expires_at = expired_at
+        challenge.email_expires_at = expired_at
+        challenge.phone_expires_at = expired_at
+        challenge.save(update_fields=["expires_at", "email_expires_at", "phone_expires_at"])
 
         resent = self.client.post(
             "/api/registrations/verification/resend/",
@@ -1117,7 +1116,7 @@ class RegistrationDuplicateValidationTests(TestCase):
         MOBILE_OTP_MODE="console",
     )
     @patch("registrations.views._new_otp", side_effect=["111111", "222222", "333333", "444444"])
-    @patch("registrations.views.send_mobile_otp")
+    @patch("registrations.views.send_mobile_otp", return_value="sent")
     def test_restored_challenge_can_resend_both_codes(
         self, send_sms, _new_otp
     ):
@@ -1139,7 +1138,7 @@ class RegistrationDuplicateValidationTests(TestCase):
         self.assertEqual(restored.status_code, 200, restored.data)
         self.assertEqual(restored.data["challenge_id"], start.data["challenge_id"])
         self.assertTrue(restored.data["verification_in_progress"])
-        self.assertEqual(restored.data["mobile_delivery"], "development_console")
+        self.assertEqual(restored.data["mobile_delivery"], "restored")
 
         email_resend = self.client.post(
             "/api/registrations/verification/resend/",
@@ -1184,7 +1183,7 @@ class RegistrationDuplicateValidationTests(TestCase):
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
         DEFAULT_FROM_EMAIL="no-reply@example.com",
     )
-    @patch("registrations.views.send_mobile_otp")
+    @patch("registrations.views.send_mobile_otp", return_value="sent")
     def test_restarting_an_active_challenge_does_not_reset_attempts_or_resend(self, send_sms):
         start = self.client.post(
             "/api/registrations/verification/start/",
@@ -1240,32 +1239,32 @@ class RegistrationDuplicateValidationTests(TestCase):
         MOBILE_OTP_MODE="console",
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
         DEFAULT_FROM_EMAIL="no-reply@example.com",
-        OTP_EXPIRY_SECONDS=300,
+        OTP_EXPIRY_SECONDS=600,
         OTP_RESEND_COOLDOWN_SECONDS=60,
     )
+    @patch("registrations.views.send_mobile_otp", return_value="sent")
     @patch("registrations.views._new_otp", side_effect=["111111", "222222"])
-    def test_mobile_code_is_logged_hashed_phone_bound_and_single_use(self, _new_otp):
-        with self.assertLogs("registrations.verification", level="WARNING") as logs:
-            response = self.client.post(
-                "/api/registrations/verification/start/",
-                {"email": "development-otp@example.com", "phone": "9123456780"},
-                format="json",
-            )
+    def test_mobile_code_is_hashed_phone_bound_and_single_use(self, _new_otp, send_sms):
+        response = self.client.post(
+            "/api/registrations/verification/start/",
+            {"email": "development-otp@example.com", "phone": "9123456780"},
+            format="json",
+        )
 
         self.assertEqual(response.status_code, 200, response.data)
         self.assertGreater(response.data["expires_in"], 0)
-        self.assertLessEqual(response.data["expires_in"], 300)
-        self.assertEqual(response.data["mobile_delivery"], "development_console")
+        self.assertLessEqual(response.data["expires_in"], 600)
+        self.assertEqual(response.data["mobile_delivery"], "sent")
         self.assertNotIn("111111", json.dumps(response.data))
         self.assertNotIn("222222", json.dumps(response.data))
-        self.assertIn("phone ending in 6780: 222222", "\n".join(logs.output))
+        send_sms.assert_called_once_with("9123456780", "222222")
 
         challenge = VerificationChallenge.objects.get(pk=response.data["challenge_id"])
         self.assertTrue(check_password("222222", challenge.phone_otp_hash))
         self.assertNotEqual(challenge.phone_otp_hash, "222222")
         self.assertLessEqual(
-            abs((challenge.expires_at - challenge.created_at).total_seconds() - 300),
-            1,
+            abs((challenge.expires_at - challenge.created_at).total_seconds() - 600),
+            3,
         )
 
         missing_phone = self.client.post(
@@ -1323,10 +1322,11 @@ class RegistrationDuplicateValidationTests(TestCase):
         MOBILE_OTP_MODE="console",
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
         DEFAULT_FROM_EMAIL="no-reply@example.com",
-        OTP_EXPIRY_SECONDS=300,
+        OTP_EXPIRY_SECONDS=600,
     )
+    @patch("registrations.views.send_mobile_otp", return_value="sent")
     @patch("registrations.views._new_otp", side_effect=["333333", "444444"])
-    def test_mobile_code_expires_after_five_minutes(self, _new_otp):
+    def test_mobile_code_expires_after_ten_minutes(self, _new_otp, send_sms):
         started_at = timezone.now()
         with patch("registrations.views.timezone.now", return_value=started_at):
             start = self.client.post(
@@ -1338,12 +1338,12 @@ class RegistrationDuplicateValidationTests(TestCase):
         challenge = VerificationChallenge.objects.get(pk=start.data["challenge_id"])
         self.assertEqual(
             (challenge.expires_at - started_at).total_seconds(),
-            300,
+            600,
         )
 
         with patch(
             "registrations.views.timezone.now",
-            return_value=started_at + timedelta(minutes=5, seconds=1),
+            return_value=started_at + timedelta(minutes=10, seconds=1),
         ):
             expired = self.client.post(
                 "/api/registrations/verification/verify/",
@@ -1363,13 +1363,15 @@ class RegistrationDuplicateValidationTests(TestCase):
         MOBILE_OTP_MODE="disabled",
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
         DEFAULT_FROM_EMAIL="no-reply@example.com",
+        GENOVA_SMS_ACCESS_TOKEN="",
+        GENOVA_SMS_ACCESS_TOKEN_KEY="",
     )
     @patch("registrations.views._new_otp", side_effect=["555555", "666666"])
     @patch("registrations.views.send_email_otp")
-    def test_production_mode_fails_closed_without_sms_provider(
+    def test_mobile_delivery_fails_closed_without_genova_credentials(
         self, send_email, _new_otp
     ):
-        with self.assertLogs("registrations.verification", level="ERROR") as logs:
+        with self.assertLogs("registrations.views", level="WARNING") as logs:
             response = self.client.post(
                 "/api/registrations/verification/start/",
                 {"email": "production-otp@example.com", "phone": "9123456780"},
@@ -1447,7 +1449,7 @@ class RegistrationDuplicateValidationTests(TestCase):
         DEFAULT_FROM_EMAIL="private.sender@example.com",
     )
     @patch("registrations.views._new_otp", side_effect=["135790", "246801"])
-    @patch("registrations.views.send_mobile_otp")
+    @patch("registrations.views.send_mobile_otp", return_value="sent")
     @patch(
         "registrations.verification.send_mail",
         side_effect=smtplib.SMTPAuthenticationError(

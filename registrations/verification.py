@@ -207,7 +207,7 @@ def _log_genova_response(
                         error_code = candidate
                     break
 
-    logger.info(
+    logger.warning(
         "Genova SMS response: http_status=%s provider_status=%s error_code=%s",
         http_status,
         provider_status,

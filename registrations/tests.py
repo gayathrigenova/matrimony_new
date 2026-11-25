@@ -5,6 +5,7 @@ import re
 import json
 import smtplib
 from unittest.mock import Mock, patch
+from urllib.parse import parse_qs
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password
@@ -22,10 +23,64 @@ from adminpanel.models import ProfileChange
 
 from .models import Registration, VerificationChallenge
 from .serializers import RegistrationSerializer
-from .verification import VerificationDeliveryError, send_email_otp
+from .verification import (
+    VerificationDeliveryError,
+    _send_genova_registration_otp,
+    send_email_otp,
+)
 
 
 User = get_user_model()
+
+
+class GenovaSmsRequestTests(TestCase):
+    def test_request_uses_curl_form_fields_and_same_expiry_for_signature(self):
+        with override_settings(
+            GENOVA_SMS_ACCESS_TOKEN="test-access-token",
+            GENOVA_SMS_ACCESS_TOKEN_KEY="test-access-token-key",
+            GENOVA_SMS_API_URL="https://sms.genovatechnologies.com/api/sms/v1.0/send-sms",
+            GENOVA_SMS_ROUTE="transactional",
+            GENOVA_SMS_HEADER="TESTID",
+            GENOVA_SMS_ENTITY_ID="1234567890123456789",
+            GENOVA_OTP_TEMPLATE_ID="9876543210987654321",
+            GENOVA_SMS_CONTENT_TYPE="text",
+            GENOVA_SMS_WEBHOOK_ID="test-webhook-id",
+            SMS_TIMEOUT=10,
+        ), patch("registrations.verification.datetime") as mock_datetime, patch(
+            "registrations.verification._genova_auth_signature",
+            return_value="test-signature",
+        ) as mock_signature, patch(
+            "registrations.verification.urlopen"
+        ) as mock_urlopen:
+            mock_datetime.now.return_value.timestamp.return_value = 1724837770.9
+            response = mock_urlopen.return_value.__enter__.return_value
+            response.status = 200
+            response.read.return_value = b'{"status":"success"}'
+
+            result = _send_genova_registration_otp("+919123456789", "123456")
+
+        self.assertEqual(result, "sent")
+        mock_signature.assert_called_once_with(
+            "test-access-token", "test-access-token-key", 1724837770
+        )
+        request = mock_urlopen.call_args.args[0]
+        self.assertEqual(request.get_method(), "POST")
+        self.assertEqual(
+            request.get_header("Content-type"),
+            "application/x-www-form-urlencoded",
+        )
+        self.assertEqual(request.get_header("Accept"), "application/json")
+        form = parse_qs(request.data.decode("ascii"))
+        self.assertEqual(form["expire"], ["1724837770"])
+        self.assertEqual(form["authSignature"], ["test-signature"])
+        self.assertEqual(form["route"], ["transactional"])
+        self.assertEqual(form["contentType"], ["text"])
+        self.assertEqual(form["messageContent"], [
+            "Your Keralakkara Matrimony registration OTP is 123456. "
+            "Valid for 10 minutes. Do not share this OTP with anyone."
+        ])
+        self.assertEqual(form["removeDuplicateNumbers"], ["1"])
+        self.assertEqual(form["webHookId"], ["test-webhook-id"])
 
 
 class RegistrationCasteValidationTests(TestCase):

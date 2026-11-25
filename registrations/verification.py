@@ -237,22 +237,28 @@ def _send_genova_registration_otp(phone, otp):
         f"{otp}. Valid for 10 minutes. Do not share this OTP with anyone."
     )
     payload = {
-        "RequestFor": "send-sms",
         "accessToken": access_token,
         "expire": expire,
         "authSignature": signature,
         "route": settings.GENOVA_SMS_ROUTE,
         "smsHeader": settings.GENOVA_SMS_HEADER,
+        "messageContent": message,
+        "recipients": phone,
+        "contentType": settings.GENOVA_SMS_CONTENT_TYPE,
         "entityId": settings.GENOVA_SMS_ENTITY_ID,
         "templateId": settings.GENOVA_OTP_TEMPLATE_ID,
-        "contentType": settings.GENOVA_SMS_CONTENT_TYPE,
-        "recipients": phone,
-        "message": message,
+        "removeDuplicateNumbers": "1",
     }
+    webhook_id = settings.GENOVA_SMS_WEBHOOK_ID
+    if webhook_id:
+        payload["webHookId"] = webhook_id
     request = Request(
         settings.GENOVA_SMS_API_URL,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        data=urlencode(payload).encode("ascii"),
+        headers={
+            "Accept": "application/json",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
         method="POST",
     )
     try:

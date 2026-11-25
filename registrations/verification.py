@@ -230,13 +230,14 @@ def _send_genova_registration_otp(phone, otp):
             + "."
         )
 
-    expire = int(datetime.now(datetime_timezone.utc).timestamp())
+    expire = int(datetime.now(datetime_timezone.utc).timestamp()) + 60
     signature = _genova_auth_signature(access_token, access_token_key, expire)
     message = (
         "Your Keralakkara Matrimony registration OTP is "
         f"{otp}. Valid for 10 minutes. Do not share this OTP with anyone."
     )
     payload = {
+        "RequestFor": "send-sms",
         "accessToken": access_token,
         "expire": expire,
         "authSignature": signature,

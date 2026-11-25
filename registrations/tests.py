@@ -61,7 +61,7 @@ class GenovaSmsRequestTests(TestCase):
 
         self.assertEqual(result, "sent")
         mock_signature.assert_called_once_with(
-            "test-access-token", "test-access-token-key", 1724837770
+            "test-access-token", "test-access-token-key", 1724837830
         )
         request = mock_urlopen.call_args.args[0]
         self.assertEqual(request.get_method(), "POST")
@@ -71,7 +71,8 @@ class GenovaSmsRequestTests(TestCase):
         )
         self.assertEqual(request.get_header("Accept"), "application/json")
         form = parse_qs(request.data.decode("ascii"))
-        self.assertEqual(form["expire"], ["1724837770"])
+        self.assertEqual(form["RequestFor"], ["send-sms"])
+        self.assertEqual(form["expire"], ["1724837830"])
         self.assertEqual(form["authSignature"], ["test-signature"])
         self.assertEqual(form["route"], ["transactional"])
         self.assertEqual(form["contentType"], ["text"])

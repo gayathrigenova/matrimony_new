@@ -519,6 +519,12 @@
   margin-top: 0.75rem;
 }
 
+.registration-otp-countdown {
+  margin: 0 0 0.45rem;
+  color: #555;
+  font-size: 0.82rem;
+}
+
 .registration-channel-otp > label {
   margin-bottom: 0.4rem;
 }
@@ -530,12 +536,6 @@
 .registration-resend-message.info {
   color: #294d83;
 }
-
-.registration-new-codes-btn {
-  display: block;
-  margin: 0 auto;
-}
-
 
 /* =====================================================
    RESPONSIVE

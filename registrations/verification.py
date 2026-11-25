@@ -163,6 +163,58 @@ def _genova_auth_signature(access_token, access_token_key, expire):
     ).hexdigest()
 
 
+def _log_genova_response(
+    http_status, response_body, phone, otp, access_token, access_token_key, signature
+):
+    provider_status = None
+    error_code = None
+    sensitive_values = (
+        str(otp or ""),
+        re.sub(r"\D", "", phone or ""),
+        str(access_token or ""),
+        str(access_token_key or ""),
+        str(signature or ""),
+    )
+    sensitive_values = tuple(
+        value.casefold() for value in sensitive_values if value
+    )
+
+    try:
+        body = json.loads(response_body)
+    except Exception:
+        body = None
+
+    if isinstance(body, dict):
+        for field, keys in (
+            ("provider_status", ("status", "providerStatus", "provider_status")),
+            ("error_code", ("errorCode", "error_code", "code")),
+        ):
+            for key in keys:
+                value = body.get(key)
+                if not isinstance(value, (str, int)) or isinstance(value, bool):
+                    continue
+                candidate = str(value)
+                candidate_folded = candidate.casefold()
+                if (
+                    re.fullmatch(r"[A-Za-z][A-Za-z0-9_.-]{0,63}", candidate)
+                    and not any(
+                        secret in candidate_folded for secret in sensitive_values
+                    )
+                ):
+                    if field == "provider_status":
+                        provider_status = candidate
+                    else:
+                        error_code = candidate
+                    break
+
+    logger.info(
+        "Genova SMS response: http_status=%s provider_status=%s error_code=%s",
+        http_status,
+        provider_status,
+        error_code,
+    )
+
+
 def _send_genova_registration_otp(phone, otp):
     access_token = settings.GENOVA_SMS_ACCESS_TOKEN
     access_token_key = settings.GENOVA_SMS_ACCESS_TOKEN_KEY
@@ -205,9 +257,37 @@ def _send_genova_registration_otp(phone, otp):
     )
     try:
         with urlopen(request, timeout=settings.SMS_TIMEOUT) as response:
+            try:
+                response_body = response.read(65536)
+            except Exception:
+                response_body = b""
+            _log_genova_response(
+                response.status,
+                response_body,
+                phone,
+                otp,
+                access_token,
+                access_token_key,
+                signature,
+            )
             if not 200 <= response.status < 300:
                 raise OSError(f"Unexpected provider status {response.status}")
-    except (HTTPError, URLError, OSError, ValueError) as exc:
+    except HTTPError as exc:
+        try:
+            response_body = exc.read(65536)
+        except Exception:
+            response_body = b""
+        _log_genova_response(
+            exc.code,
+            response_body,
+            phone,
+            otp,
+            access_token,
+            access_token_key,
+            signature,
+        )
+        _provider_error("genova", exc)
+    except (URLError, OSError, ValueError) as exc:
         _provider_error("genova", exc)
     return "sent"
 

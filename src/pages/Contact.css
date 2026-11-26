@@ -2,10 +2,10 @@
 .contact-banner {
   background-image:
   linear-gradient(
-    135deg,
-    rgba(170, 239, 201, 0.279) 0%,
-    rgba(140, 239, 189, 0.6) 50%,
-    rgba(3, 100, 51, 0.55) 100%
+    to bottom,
+    rgba(0,0,0,0.55) 0%,
+    rgba(0,0,0,0.25) 45%,
+    rgba(0,0,0,0) 100%
   ),
   url("../assets/ContactUs.png");
 

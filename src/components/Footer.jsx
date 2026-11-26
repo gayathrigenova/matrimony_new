@@ -1,5 +1,6 @@
 import { Phone, MessageCircle } from 'lucide-react';
 import './Footer.css';
+import customerCare from '../assets/customercare.png';
 
 export default function Footer() {
   return (
@@ -7,7 +8,7 @@ export default function Footer() {
       <div className="km-footer-inner">
         <div className="km-footer-left">
           <img
-            src="https://randomuser.me/api/portraits/women/68.jpg"
+            src={customerCare}
             alt="Customer Care Executive"
             className="km-footer-lady"
           />

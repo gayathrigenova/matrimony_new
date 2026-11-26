@@ -64,7 +64,9 @@
 
 /* Polished Form Card Design */
 .hero-form-card {
-  background: #ffffff;
+  background: rgba(255, 250, 240, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   padding: 1.75rem 2rem;
   border-radius: 14px;
   box-shadow: 0 12px 35px rgba(0, 0, 0, 0.25);

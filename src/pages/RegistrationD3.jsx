@@ -752,6 +752,21 @@ export default function RegistrationStep3() {
           </form>
         </div>
       </div>
+
+      {legalModal && (
+        <div className="reg3-legal-overlay" onClick={() => setLegalModal(null)}>
+          <div className="reg3-legal-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="reg3-legal-header">
+              <h2>{legalModal === "terms" ? "Terms of Use – Keralakkara Matrimony" : "Privacy Policy – Keralakkara Matrimony"}</h2>
+              <span className="reg3-legal-updated">Last Updated: January 1, 2025</span>
+              <button className="reg3-legal-close" onClick={() => setLegalModal(null)} aria-label="Close">&times;</button>
+            </div>
+            <div className="reg3-legal-content">
+              <pre>{legalModal === "terms" ? TERMS_TEXT : PRIVACY_TEXT}</pre>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

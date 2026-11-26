@@ -342,7 +342,11 @@ export default function Home() {
       {legalModal && (
         <div className="hero-legal-backdrop" onClick={() => setLegalModal(null)}>
           <div className="hero-legal-modal" onClick={(e) => e.stopPropagation()}>
-            <button className="hero-legal-close" onClick={() => setLegalModal(null)} aria-label="Close">×</button>
+            <div className="hero-legal-header">
+              <h2>{legalModal === 'terms' ? "Terms of Use – Keralakkara Matrimony" : "Privacy Policy – Keralakkara Matrimony"}</h2>
+              <span className="hero-legal-updated">Last Updated: January 1, 2025</span>
+              <button className="hero-legal-close" onClick={() => setLegalModal(null)} aria-label="Close">&times;</button>
+            </div>
             <div className="hero-legal-content">
               <pre>{legalModal === 'terms' ? TERMS_TEXT : PRIVACY_TEXT}</pre>
             </div>

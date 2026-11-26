@@ -534,10 +534,13 @@
   background: none;
   border: none;
   color: #00ab5b;
-  text-decoration: underline;
+  text-decoration: none;
   cursor: pointer;
   font: inherit;
   padding: 0;
+}
+.hero-legal-link:hover {
+  text-decoration: underline;
 }
 
 .hero-legal-backdrop {
@@ -553,32 +556,58 @@
 
 .hero-legal-modal {
   background: #fff;
-  border-radius: 12px;
-  max-width: 720px;
+  border-radius: 14px;
   width: 100%;
-  max-height: 80vh;
+  max-width: 900px;
+  max-height: 85vh;
   display: flex;
   flex-direction: column;
   position: relative;
+  overflow: hidden;
 }
-
+.hero-legal-header {
+  background: #0f5132;
+  color: #fff;
+  padding: 1.25rem 1.75rem;
+  position: relative;
+}
+.hero-legal-header h2 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+.hero-legal-updated {
+  display: block;
+  font-size: 0.8rem;
+  opacity: 0.85;
+  margin-top: 0.25rem;
+}
 .hero-legal-close {
   position: absolute;
-  top: 0.5rem;
-  right: 0.75rem;
+  top: 0.6rem;
+  right: 0.9rem;
   background: none;
   border: none;
-  font-size: 1.75rem;
+  font-size: 2rem;
   cursor: pointer;
-  color: #333;
+  color: #fff;
+  line-height: 1;
 }
-
 .hero-legal-content {
   overflow-y: auto;
-  padding: 2rem 1.5rem;
+  overflow-x: hidden;
+  padding: 2rem 1.75rem;
   white-space: pre-wrap;
-  font-size: 0.9rem;
-  line-height: 1.6;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: #222;
+  background: #faf7f2;
+}
+.hero-legal-content pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  margin: 0;
+  font: inherit;
 }
 
 .registration-field-error {

@@ -620,7 +620,7 @@ export default function RegistrationStep3() {
                 CONTACT DETAILS
             ================================== */}
             <h2 className="reg3-section-title">
-              Contact Details
+              Guardian / Parent Details
             </h2>
 
             {/* Contact Person */}
@@ -752,12 +752,6 @@ export default function RegistrationStep3() {
           </form>
         </div>
       </div>
-    </>
-  );
-
-  return (
-    <>
-      <div />
     </>
   );
 }

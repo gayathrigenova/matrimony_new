@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+import hashlib
 from io import BytesIO
 import tempfile
 import re
@@ -25,6 +26,7 @@ from .models import Registration, VerificationChallenge
 from .serializers import RegistrationSerializer
 from .verification import (
     VerificationDeliveryError,
+    _genova_auth_signature,
     _send_genova_registration_otp,
     send_email_otp,
 )
@@ -66,6 +68,10 @@ class GenovaSmsRequestTests(TestCase):
         request = mock_urlopen.call_args.args[0]
         self.assertEqual(request.get_method(), "POST")
         self.assertEqual(
+            request.full_url,
+            "https://sms.genovatechnologies.com/api/sms/v1.0/send-sms",
+        )
+        self.assertEqual(
             request.get_header("Content-type"),
             "application/x-www-form-urlencoded",
         )
@@ -74,6 +80,7 @@ class GenovaSmsRequestTests(TestCase):
         self.assertEqual(form["RequestFor"], ["send-sms"])
         self.assertEqual(form["expire"], ["1724837830"])
         self.assertEqual(form["authSignature"], ["test-signature"])
+        self.assertEqual(form["accessToken"], ["test-access-token"])
         self.assertEqual(form["route"], ["transactional"])
         self.assertEqual(form["contentType"], ["text"])
         self.assertEqual(form["messageContent"], [
@@ -81,7 +88,30 @@ class GenovaSmsRequestTests(TestCase):
             "Valid for 10 minutes. Do not share this OTP with anyone."
         ])
         self.assertEqual(form["removeDuplicateNumbers"], ["1"])
+        self.assertEqual(form["smsHeader"], ["TESTID"])
+        self.assertEqual(form["recipients"], ["+919123456789"])
+        self.assertEqual(form["entityId"], ["1234567890123456789"])
+        self.assertEqual(form["templateId"], ["9876543210987654321"])
         self.assertEqual(form["webHookId"], ["test-webhook-id"])
+
+    def test_signature_uses_documented_md5_steps(self):
+        access_token = "test-access-token"
+        access_token_key = "test-access-token-key"
+        expire = 1724837830
+        time_key = hashlib.md5(
+            f"send-smssms@rits-v1.0{expire}".encode("utf-8")
+        ).hexdigest()
+        time_access_token_key = hashlib.md5(
+            f"{access_token}{time_key}".encode("utf-8")
+        ).hexdigest()
+        expected = hashlib.md5(
+            f"{time_access_token_key}{access_token_key}".encode("utf-8")
+        ).hexdigest()
+
+        self.assertEqual(
+            _genova_auth_signature(access_token, access_token_key, expire),
+            expected,
+        )
 
 
 class RegistrationCasteValidationTests(TestCase):

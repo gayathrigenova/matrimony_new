@@ -629,7 +629,6 @@ export default function Registration() {
                     {startingChannel === "mobile" ? "Sending..." : "Send Mobile OTP"}
                   </button>
                 </div>
-              </div>
               {fieldErrors.phone && <small className="registration-field-error" role="alert">{fieldErrors.phone}</small>}
               <p className={`registration-channel-status ${verification?.mobileVerified ? "verified" : ""}`}>
                 Mobile: {verification?.mobileVerified ? "Verified" : "Not Verified"}
@@ -698,6 +697,7 @@ export default function Registration() {
                   )}
                 </div>
               )}
+              </div>
             </div>
 
             {/* EMAIL */}

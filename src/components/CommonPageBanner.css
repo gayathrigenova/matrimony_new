@@ -1,0 +1,45 @@
+.common-page-banner.search-banner,
+.common-page-banner.mem-banner,
+.common-page-banner.registration-banner {
+  background-image:
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0.12) 35%, rgba(0, 0, 0, 0) 60%),
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.34),
+      rgba(255, 255, 255, 0.16)
+    ),
+    url("../assets/commonpage.png");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  min-height: 280px;
+  padding: 7rem 1rem 2.5rem;
+}
+
+.common-page-banner .search-banner-content,
+.common-page-banner .mem-banner-content,
+.common-page-banner .registration-banner-overlay {
+  color: #155d39;
+}
+
+.common-page-banner .search-back-btn {
+  color: #155d39;
+}
+
+@media (max-width: 768px) {
+  .common-page-banner.search-banner,
+  .common-page-banner.mem-banner,
+  .common-page-banner.registration-banner {
+    min-height: 230px;
+    padding: 6rem 1rem 2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .common-page-banner.search-banner,
+  .common-page-banner.mem-banner,
+  .common-page-banner.registration-banner {
+    min-height: 200px;
+    padding: 5.5rem 0.75rem 1.75rem;
+  }
+}

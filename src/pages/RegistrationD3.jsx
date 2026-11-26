@@ -2,6 +2,8 @@ import { API_URL, readApiResponse } from "../api.js";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import "./RegistrationD3.css";
+import { TERMS_TEXT, PRIVACY_TEXT } from "../data/legalTexts";
+import { INDIAN_STATES, STATE_CITIES } from "../data/indianStatesCities";
 
 const KERALA_DISTRICTS = [
   "Thiruvananthapuram",
@@ -27,7 +29,8 @@ export default function RegistrationStep3() {
   // Step 1 + Step 2 data
   const registration = location.state?.registration || null;
 
-  const [formData, setFormData] = useState(() => ({
+  const [legalModal, setLegalModal] = useState(null);
+  const [formData, setFormData] = useState({
     // Family Details
     fatherName: "",
     fatherOccupation: "",
@@ -42,6 +45,7 @@ export default function RegistrationStep3() {
 
     // Permanent / Native Address
     place: "",
+    city: "",
     houseName: "",
     busStop: "",
     postOffice: "",
@@ -58,7 +62,7 @@ export default function RegistrationStep3() {
     // Terms
     acceptTerms: false,
     ...location.state?.step3FormData,
-  }));
+  });
 
   // =========================
   // HANDLE INPUT CHANGE
@@ -69,6 +73,7 @@ export default function RegistrationStep3() {
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
+      ...(name === "place" ? { city: "" } : {}),
     }));
   };
 
@@ -118,6 +123,8 @@ export default function RegistrationStep3() {
       // Permanent Address
       // -------------------------
       place: formData.place,
+      state: formData.place,
+      city: formData.city,
       house_name: formData.houseName,
       bus_stop: formData.busStop,
       post_office: formData.postOffice,
@@ -477,10 +484,10 @@ export default function RegistrationStep3() {
               Permanent / Native Address
             </h2>
 
-            {/* Place */}
+            {/* State */}
             <div className="reg3-form-group">
               <label>
-                Place <span>*</span>
+                State <span>*</span>
               </label>
 
               <select
@@ -493,17 +500,36 @@ export default function RegistrationStep3() {
                   --SELECT--
                 </option>
 
-                <option value="Kerala">
-                  Kerala
+                {INDIAN_STATES.map((state) => (
+                  <option key={state} value={state}>
+                    {state}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* City */}
+            <div className="reg3-form-group">
+              <label>
+                City <span>*</span>
+              </label>
+
+              <select
+                name="city"
+                value={formData.city}
+                onChange={handleChange}
+                required
+                disabled={!formData.place}
+              >
+                <option value="">
+                  {formData.place ? "--SELECT--" : "Select State first"}
                 </option>
 
-                <option value="Tamil Nadu">
-                  Tamil Nadu
-                </option>
-
-                <option value="Karnataka">
-                  Karnataka
-                </option>
+                {(STATE_CITIES[formData.place] || []).map((city) => (
+                  <option key={city} value={city}>
+                    {city}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -687,17 +713,17 @@ export default function RegistrationStep3() {
                 required
               />
 
-              <label htmlFor="acceptTerms">
-                I agree to the
-                <a href="#">
-                  {" "}Terms &amp; Conditions{" "}
-                </a>
-                and
-                <a href="#">
-                  {" "}Privacy Policy
-                </a>
-                .
-              </label>
+               <label htmlFor="acceptTerms">
+                 I agree to the
+                 <button type="button" className="reg3-legal-link" onClick={() => setLegalModal('terms')}>
+                   {" "}Terms &amp; Conditions{" "}
+                 </button>
+                 and
+                 <button type="button" className="reg3-legal-link" onClick={() => setLegalModal('privacy')}>
+                   {" "}Privacy Policy
+                 </button>
+                 .
+               </label>
             </div>
 
             {/* =================================
@@ -726,6 +752,12 @@ export default function RegistrationStep3() {
           </form>
         </div>
       </div>
+    </>
+  );
+
+  return (
+    <>
+      <div />
     </>
   );
 }

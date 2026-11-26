@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BIRTH_STAR_OPTIONS, CASTE_OPTIONS } from '../constants.js';
 import { API_URL, fetchWithTokenRefresh, readApiResponse } from '../api.js';
+import commonPageBanner from '../assets/commonpage.png';
 import './Search.css';
 
 export default function Search() {
@@ -70,6 +71,7 @@ export default function Search() {
     <>
       {/* Banner */}
       <div className="search-banner">
+        <img className="search-banner-image" src={commonPageBanner} alt="" aria-hidden="true" />
         <button className="search-back-btn" onClick={() => navigate(-1)}>&#8592; Back</button>
         <div className="search-banner-content">
           <h1>Search Your Partner Here</h1>

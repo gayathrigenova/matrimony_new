@@ -112,11 +112,12 @@
   height: 320px;
 
   background:
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0.12) 35%, rgba(0, 0, 0, 0) 60%),
     linear-gradient(
       rgba(255, 255, 255, 0.83),
       rgba(2, 69, 38, 0.55)
     ),
-    url("../assets/img3.png")
+    url("../assets/commonpage.png")
       center / cover no-repeat;
 
   display: flex;

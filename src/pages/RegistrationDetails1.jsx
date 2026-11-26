@@ -46,16 +46,8 @@ export default function RegistrationDetails1() {
       return;
     }
 
-    if (
-      !formData.education ||
-      !formData.highestEducation ||
-      !formData.occupationLevel ||
-      !formData.occupation ||
-      !formData.workLocation ||
-      !formData.workingPlace ||
-      !formData.height
-    ) {
-      alert("Please fill all required fields.");
+    if (formData.annualIncome && !/^\d+$/.test(String(formData.annualIncome).trim())) {
+      alert("Annual income must be a number.");
       return;
     }
 

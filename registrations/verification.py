@@ -55,7 +55,7 @@ def send_email_otp(email, otp):
     expiry_minutes = max(1, settings.OTP_EXPIRY_SECONDS // 60)
     try:
         sent = send_mail(
-            "Your Matrimony verification code",
+            "Your Keralakkara Matrimony verification code",
             (
                 f"Your email verification code is {otp}. "
                 f"It expires in {expiry_minutes} minutes."

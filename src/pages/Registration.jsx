@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { API_URL, readApiResponse } from "../api.js";
 import { BIRTH_STAR_OPTIONS, CASTE_OPTIONS } from "../constants.js";
 import "./Registration.css";
+import "../components/CommonPageBanner.css";
 
 export default function Registration() {
   const navigate = useNavigate();
@@ -372,7 +373,7 @@ export default function Registration() {
       {/* =========================
           BANNER
       ========================= */}
-      <section className="registration-banner">
+      <section className="registration-banner common-page-banner">
 
         <div className="registration-banner-overlay">
 

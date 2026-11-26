@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react';
 import './Contact.css';
-import contactImage from '../assets/img8.png';
 import { API_URL, readApiResponse } from '../api.js';
 import { Clock3, Mail, MapPin, Phone } from 'lucide-react';
 
@@ -75,9 +74,8 @@ export default function Contact() {
         ))}
       </div>
 
-      {/* Form + Map Section */}
+      {/* Contact Form */}
       <div className="contact-main-section">
-        {/* Form */}
         <div className="contact-form-card">
           <h2>Send Us a Message</h2>
           <p>Fill out the form and our team will get back to you shortly.</p>
@@ -123,39 +121,8 @@ export default function Contact() {
           )}
         </div>
 
-        {/* Side Image + Social */}
-        <div className="contact-side">
-          <img src={contactImage} alt="Contact" />
-          {/* <div className="contact-social-card">
-            <h3>Follow Us</h3>
-            <div className="contact-socials">
-              {[
-                { icon: "📘", label: "Facebook", handle: "@KeralakaraMatrimony" },
-                { icon: "📸", label: "Instagram", handle: "@Keralakara.Matrimony" },
-                { icon: "🐦", label: "Twitter", handle: "@KeralakaraMatrimony" },
-              ].map(s => (
-                <div className="social-item" key={s.label}>
-                  <span>{s.icon}</span>
-                  <div>
-                    <strong>{s.label}</strong>
-                    <small>{s.handle}</small>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div> */}
-        </div>
       </div>
 
-      {/* Map */}
-      <div className="contact-map">
-        <iframe
-          title="KM Location"
-          src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3929.0!2d76.2673!3d9.9816!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMTDCsDU4JzUzLjgiTiA3NsKwMTYnMDIuMyJF!5e0!3m2!1sen!2sin!4v1234567890"
-          allowFullScreen=""
-          loading="lazy"
-        />
-      </div>
     </>
   );
 }

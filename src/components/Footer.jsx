@@ -1,48 +1,45 @@
-import { Link } from 'react-router-dom';
+import { Phone, MessageCircle } from 'lucide-react';
 import './Footer.css';
-import logo from '../assets/logo_km1.png';
 
 export default function Footer() {
   return (
-    <footer className="eb-footer">
-      <div className="eb-footer-content">
-        
-        <div className="eb-footer-section">
-<div className="footer-logo">
-  <img src={logo} alt="km Logo" className="footer-logo-img" />
-</div>
-          <p>
-            A trusted matrimony platform dedicated to helping members of our
-            community find their perfect life partner through secure and verified
-            profiles.
-          </p>
+    <footer className="km-footer">
+      <div className="km-footer-inner">
+        <div className="km-footer-left">
+          <img
+            src="https://randomuser.me/api/portraits/women/68.jpg"
+            alt="Customer Care Executive"
+            className="km-footer-lady"
+          />
+          <div className="km-footer-text">
+            <h3 className="km-footer-heading">Customer Care Executive</h3>
+            <p className="km-footer-sub">We're here to help you!</p>
+          </div>
         </div>
 
-        <div className="eb-footer-section">
-          <h4>Quick Links</h4>
-          <ul>
-            <li><a href="/Search">Search</a></li>
-            <li><a href="/membership">Membership </a></li>
-            <li><a href="/registration">Register</a></li>
-            <li><a href="profiles">Profile</a></li>
-            <li><a href="/contact">Contact Us</a></li>
-          </ul>
-        </div>
+        <div className="km-footer-divider" />
 
-        <div className="eb-footer-section">
-          <h4>Our Community</h4>
-          <ul>
-            <li><a href="#profiles">Verified Profiles</a></li>
-            {/* <li><a href="#success">Success Stories</a></li>
-            <li><a href="#safety">Safety Tips</a></li> */}
-            <li><Link to="/faq">FAQs</Link></li>
-          </ul>
+        <div className="km-footer-contact">
+          <a href="https://wa.me/917559080005" target="_blank" rel="noreferrer" className="km-footer-contact-row">
+            <MessageCircle size={22} className="km-footer-icon km-footer-icon-wa" />
+            <span>+91 755 908 0005</span>
+          </a>
+          <a href="tel:+917559080005" className="km-footer-contact-row">
+            <Phone size={22} className="km-footer-icon km-footer-icon-phone" />
+            <span>+91 755 908 0005</span>
+          </a>
         </div>
-
       </div>
 
-      <div className="eb-footer-bottom">
-        <p>&copy; 2026 Genova Technologies Pvt Ltd. All Rights Reserved.</p>
+      <div className="km-footer-curve">
+        <svg viewBox="0 0 1440 120" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M0,60 C360,120 1080,0 1440,60 L1440,120 L0,120 Z" fill="#063b2a" />
+          <path d="M0,60 C360,120 1080,0 1440,60" fill="none" stroke="#d4af37" strokeWidth="3" />
+        </svg>
+      </div>
+
+      <div className="km-footer-bottom">
+        <p>© 2026 Genova Technologies Pvt Ltd. All Rights Reserved.</p>
       </div>
     </footer>
   );

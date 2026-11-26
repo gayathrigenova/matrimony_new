@@ -7,33 +7,16 @@ import {
   MessageCircleMore
 } from "lucide-react";
 
+import { TERMS_TEXT, PRIVACY_TEXT } from "../data/legalTexts";
 import './Home.css';
-import heroImageOne from "../assets/img5.png";
-import heroImageTwo from "../assets/img7.png";
-import heroImageThree from "../assets/img6.png";
+import homeBannerImage from "../assets/Slider.png";
 import {
   API_URL,
   hasAuthenticatedSession,
   readApiResponse,
 } from "../api.js";
 
-const sliderContent = [
-  {
-    image: heroImageOne,
-    title: <>Trust Begins With<br />Verified Malayali<br />Profiles</>,
-  },
-  {
-    image: heroImageTwo,
-    title: <>Find Your Perfect<br />Match With<br />Complete Security</>,
-  },
-  {
-    image: heroImageThree,
-    title: <>Begin Your Happy<br />Lifelong Journey<br />With Us</>,
-  }
-];
-
 export default function Home() {
-  const [currentSlide, setCurrentSlide] = useState(0);
   const [gender, setGender] = useState('male');
   const [activeFilter, setActiveFilter] = useState('all');
   const [profiles, setProfiles] = useState([]);
@@ -108,13 +91,6 @@ export default function Home() {
     };
   }, []);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % sliderContent.length);
-    }, 4000);
-    return () => clearInterval(timer);
-  }, []);
-
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -122,6 +98,12 @@ export default function Home() {
   });
   const [phoneError, setPhoneError] = useState("");
   const [checkingPhone, setCheckingPhone] = useState(false);
+  const [legalModal, setLegalModal] = useState(null);
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') setLegalModal(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const handleFormChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -160,22 +142,11 @@ export default function Home() {
 
   return (
     <div>
-      <div 
-        className="hero-slider" 
-        style={{ backgroundImage: `url(${sliderContent[currentSlide].image})` }}
-      >
+      <div className="home-hero">
+        <img className="home-hero-image" src={homeBannerImage} alt="Keralakkara Matrimony home banner" />
         <div className="hero-overlay"></div>
         <div className="hero-content-wrapper">
           
-          <div className="hero-text-side">
-            <h1>
-              {sliderContent[currentSlide].title}
-            </h1>
-            <p>
-              {sliderContent[currentSlide].description}
-            </p>
-          </div>
-
           {!isAuthenticated && <div className="hero-form-card">
             <div className="hero-form-header">
               <h3>Find Your Partner From Profiles</h3>
@@ -224,21 +195,14 @@ export default function Home() {
               <div className="terms-row">
                 <input type="checkbox" id="terms" required />
                 <label htmlFor="terms">
-                  I have read and agree to the <a href="#terms">Terms of Use</a> &{" "}
-                  <a href="#privacy">Privacy Policy</a>
+                I have read and agree to the <button type="button" className="hero-legal-link" onClick={() => setLegalModal('terms')}>Terms of Use</button> &{" "}
+                <button type="button" className="hero-legal-link" onClick={() => setLegalModal('privacy')}>Privacy Policy</button>
                 </label>
               </div>
                 
               <button type="submit" className="hero-register-btn" disabled={checkingPhone}>
                 {checkingPhone ? "Checking..." : "Register Free"}
               </button>
-
-              <div className="hero-form-footer">
-                <span>🎧 Support</span>
-                <a href="https://wa.me/917559080005" target="_blank" rel="noreferrer">
-                  💬 Chat for assistance
-                </a>
-              </div>
             </form>
           </div>}
         </div>
@@ -374,6 +338,17 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {legalModal && (
+        <div className="hero-legal-backdrop" onClick={() => setLegalModal(null)}>
+          <div className="hero-legal-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="hero-legal-close" onClick={() => setLegalModal(null)} aria-label="Close">×</button>
+            <div className="hero-legal-content">
+              <pre>{legalModal === 'terms' ? TERMS_TEXT : PRIVACY_TEXT}</pre>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

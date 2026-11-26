@@ -1,32 +1,34 @@
-/* Hero Section Layout */
-.hero-slider {
+/* Static, uncropped home banner */
+.home-hero {
   position: relative;
-  min-height: 75vh;
-  background-size: cover;
-  background-position: center;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 7rem 1.5rem 3rem 1.5rem;
+  width: 100%;
+  overflow: hidden;
+}
+
+.home-hero-image {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 .hero-overlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(rgba(255, 255, 255, 0.72), rgba(0, 0, 0, 0.763));
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.15) 40%, rgba(0, 0, 0, 0) 70%);
+  pointer-events: none;
 }
 
 .hero-content-wrapper {
-  position: relative;
+  position: absolute;
+  inset: 0;
+  margin: auto;
   z-index: 2;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   max-width: 1200px;
   width: 100%;
+  padding: 2rem 1.5rem;
   gap: 3rem;
   flex-wrap: wrap;
 }
@@ -60,23 +62,6 @@
   max-width: 90%;
 }
 
-/* New styling for the slider indicator (4 -- 4) */
-.slider-indicator {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  font-size: 1rem;
-  font-weight: 500;
-  color: #ffffff;
-}
-
-.indicator-line {
-  display: inline-block;
-  width: 40px;
-  height: 2px;
-  background-color: #ffffff;
-  opacity: 0.8;
-}
 /* Polished Form Card Design */
 .hero-form-card {
   background: #ffffff;
@@ -510,7 +495,17 @@
 }
 
 @media (max-width: 900px) {
-  .hero-content-wrapper { flex-direction: column; text-align: center; }
+  .home-hero { display: flex; flex-direction: column; }
+  .hero-overlay { display: none; }
+  .hero-content-wrapper {
+    position: relative;
+    inset: auto;
+    flex-direction: column;
+    text-align: center;
+    max-width: none;
+    padding: 2rem 1.5rem;
+    background: linear-gradient(135deg, #00733c, #00ab5b);
+  }
   .hero-text-side h1 { font-size: 2.2rem; }
   .hero-text-side { min-width: unset; max-width: 100%; }
   .hero-form-card { max-width: 100%; }
@@ -518,7 +513,6 @@
 }
 
 @media (max-width: 768px) {
-  .hero-slider { padding: 5rem 1rem 2rem; }
   .hero-text-side h1 { font-size: 1.9rem; }
   .hero-text-side p { font-size: 0.95rem; }
   .profiles-grid { grid-template-columns: repeat(2, 1fr); }
@@ -528,7 +522,7 @@
 }
 
 @media (max-width: 480px) {
-  .hero-slider { padding: 4.5rem 0.75rem 2rem; }
+  .hero-content-wrapper { padding: 1.75rem 0.75rem; }
   .hero-text-side h1 { font-size: 1.5rem; }
   .hero-form-card { padding: 1.2rem 1rem; }
   .hero-form-row { flex-direction: column; gap: 0.5rem; }
@@ -536,8 +530,58 @@
   .section-title { font-size: 1.4rem; }
   .features-grid { grid-template-columns: 1fr; }
 }
+.hero-legal-link {
+  background: none;
+  border: none;
+  color: #00ab5b;
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
+
+.hero-legal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 1rem;
+}
+
+.hero-legal-modal {
+  background: #fff;
+  border-radius: 12px;
+  max-width: 720px;
+  width: 100%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.hero-legal-close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.75rem;
+  background: none;
+  border: none;
+  font-size: 1.75rem;
+  cursor: pointer;
+  color: #333;
+}
+
+.hero-legal-content {
+  overflow-y: auto;
+  padding: 2rem 1.5rem;
+  white-space: pre-wrap;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
 .registration-field-error {
-  display: block;
   color: #b42318;
   font-size: 0.875rem;
   margin: 0.35rem 0 0.5rem;

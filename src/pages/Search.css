@@ -1,25 +1,27 @@
 /* ===== BANNER ===== */
 .search-banner {
-  background-image:
-  linear-gradient(
-    135deg,
-    rgba(254, 254, 254, 0.75) 0%,
-    rgba(179, 220, 199, 0.65) 40%,
-    rgba(224, 255, 205, 0.55) 100%
-  ),
-  url("../assets/img5.png");
-
-background-size: cover;
-background-position: center;
-background-repeat: no-repeat;
-  min-height: 260px;
+  position: relative;
+  width: 100%;
+  min-height: 280px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 7rem 1rem 2.5rem;
-  position: relative;
   overflow: hidden;
+  background: #0a3d1f;
+}
+
+.search-banner-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  z-index: 0;
+  pointer-events: none;
+  display: block;
 }
 
 .search-banner::before {
@@ -29,6 +31,7 @@ background-repeat: no-repeat;
   width: 300px; height: 300px;
   border-radius: 50%;
   background: rgba(255,255,255,0.04);
+  z-index: 1;
 }
 
 .search-banner::after {
@@ -38,6 +41,7 @@ background-repeat: no-repeat;
   width: 250px; height: 250px;
   border-radius: 50%;
   background: rgba(255,255,255,0.04);
+  z-index: 1;
 }
 
 .search-back-btn {
@@ -49,12 +53,14 @@ background-repeat: no-repeat;
   font-size: 1rem;
   cursor: pointer;
   opacity: 0.85;
+  z-index: 2;
 }
 
 .search-banner-content {
+  position: relative;
   text-align: center;
-  color: #fff;
-  z-index: 1;
+  color: #155d39;
+  z-index: 2;
 }
 
 .search-banner-content h1 {
@@ -320,7 +326,7 @@ background-repeat: no-repeat;
 }
 
 @media (max-width: 768px) {
-  .search-banner { padding: 6rem 1rem 2rem; min-height: 220px; }
+  .search-banner { padding: 6rem 1rem 2rem; min-height: 230px; }
   .search-banner-content h1 { font-size: 1.8rem; }
   .search-banner-content p { font-size: 0.9rem; }
   .filter-row { grid-template-columns: 1fr; gap: 1rem; }
@@ -332,6 +338,7 @@ background-repeat: no-repeat;
 }
 
 @media (max-width: 480px) {
+  .search-banner { padding: 5.5rem 0.75rem 1.75rem; min-height: 200px; }
   .search-banner-content h1 { font-size: 1.4rem; }
   .search-back-btn { top: 4.5rem; font-size: 0.85rem; }
   .featured-profiles { grid-template-columns: 1fr; }

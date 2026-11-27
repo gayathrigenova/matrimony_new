@@ -17,9 +17,10 @@ const plans = [
     badge: "Most Popular",
   },
   {
-    name: "Diamond Plan", price: "₹2999", period: "/6 months",
-    features: ["Unlimited Contacts", "Dedicated Relationship Manager", "Top Priority Placement", "Profile Verification Badge", "Personalised Matches"],
-    btn: "Choose Diamond", featured: false,
+    name: "Diamond Plan", price: "₹2,999", period: "/6 months",
+    features: ["50 Contact Numbers", "Dedicated Relationship Manager", "Top Priority Placement", "Premium Membership Badge", "Unlimited Messaging"],
+    btn: "Choose Diamond Plan", featured: false,
+    badge: "Premium",
   },
 ];
 
@@ -27,20 +28,26 @@ export default function Membership() {
   const navigate = useNavigate();
   const [purchaseState, setPurchaseState] = useState({ type: "", message: "" });
   const [purchasing, setPurchasing] = useState(false);
+  const [purchasingPlan, setPurchasingPlan] = useState("");
 
-  const handleGoldPurchase = async () => {
+  const handlePlanPurchase = async (planKey, description, contacts) => {
     if (!localStorage.getItem("access_token")) {
       navigate("/login", { state: { returnTo: "/membership" } });
       return;
     }
 
     setPurchasing(true);
+    setPurchasingPlan(planKey);
     setPurchaseState({ type: "", message: "" });
 
     try {
       const orderResponse = await fetchWithTokenRefresh(
         `${API_URL}/memberships/razorpay/orders/`,
-        { method: "POST" },
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plan: planKey }),
+        },
       );
       const order = await readApiResponse(orderResponse);
       if (!orderResponse.ok) {
@@ -53,7 +60,7 @@ export default function Membership() {
         amount: order.amount,
         currency: order.currency,
         name: "Matrimony",
-        description: "Gold Plan — 20 contact credits",
+        description,
         order_id: order.order_id,
         handler: async (payment) => {
           try {
@@ -69,7 +76,6 @@ export default function Membership() {
             if (!verifyResponse.ok) {
               throw new Error(result.detail || "Payment could not be confirmed.");
             }
-
             setPurchaseState({
               type: "success",
               message: `${result.message} ${result.contacts_remaining} Contacts Remaining.`,
@@ -81,10 +87,11 @@ export default function Membership() {
             });
           } finally {
             setPurchasing(false);
+            setPurchasingPlan("");
           }
         },
         modal: {
-          ondismiss: () => setPurchasing(false),
+          ondismiss: () => { setPurchasing(false); setPurchasingPlan(""); },
         },
       });
 
@@ -94,6 +101,7 @@ export default function Membership() {
           message: payment.error?.description || "Payment failed. Please try again.",
         });
         setPurchasing(false);
+        setPurchasingPlan("");
       });
       checkout.open();
     } catch (purchaseError) {
@@ -102,8 +110,12 @@ export default function Membership() {
         message: purchaseError.message || "Unable to start membership checkout.",
       });
       setPurchasing(false);
+      setPurchasingPlan("");
     }
   };
+
+  const handleGoldPurchase = () => handlePlanPurchase("gold", "Gold Plan — 20 contact credits", 20);
+  const handleDiamondPurchase = () => handlePlanPurchase("diamond", "Diamond Plan — 50 contact credits", 50);
 
   return (
     <>
@@ -139,10 +151,17 @@ export default function Membership() {
               <button
                 type="button"
                 className={plan.featured ? 'mem-btn-primary' : 'mem-btn-outline'}
-                onClick={plan.featured ? handleGoldPurchase : undefined}
-                disabled={!plan.featured || purchasing}
+                onClick={
+                  plan.name === "Gold Plan" ? handleGoldPurchase
+                  : plan.name === "Diamond Plan" ? handleDiamondPurchase
+                  : undefined
+                }
+                disabled={plan.name === "Free Plan" || (purchasing && purchasingPlan !== (plan.name === "Gold Plan" ? "gold" : "diamond"))}
               >
-                {plan.featured && purchasing ? "Starting checkout…" : plan.featured ? plan.btn : plan.name === "Free Plan" ? plan.btn : "Coming Soon"}
+                {purchasing && purchasingPlan === "gold" && plan.name === "Gold Plan" ? "Starting checkout…"
+                  : purchasing && purchasingPlan === "diamond" && plan.name === "Diamond Plan" ? "Starting checkout…"
+                  : plan.name === "Free Plan" ? plan.btn
+                  : plan.btn}
               </button>
             </div>
           ))}

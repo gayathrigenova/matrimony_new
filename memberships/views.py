@@ -27,7 +27,21 @@ User = get_user_model()
 
 GOLD_PLAN_AMOUNT = 149900
 GOLD_PLAN_CONTACTS = 20
+DIAMOND_PLAN_AMOUNT = 299900
+DIAMOND_PLAN_CONTACTS = 50
 RAZORPAY_API_URL = "https://api.razorpay.com/v1"
+
+PLAN_CONFIG = {
+    "gold": {"amount": GOLD_PLAN_AMOUNT, "contacts": GOLD_PLAN_CONTACTS, "label": "gold_contacts_20"},
+    "diamond": {"amount": DIAMOND_PLAN_AMOUNT, "contacts": DIAMOND_PLAN_CONTACTS, "label": "diamond_contacts_50"},
+}
+
+
+def _plan_for_amount(amount):
+    for key, plan in PLAN_CONFIG.items():
+        if plan["amount"] == amount:
+            return key, plan
+    return "gold", PLAN_CONFIG["gold"]
 
 
 class PaymentServiceUnavailable(APIException):
@@ -100,9 +114,11 @@ def _mark_order_paid(order, payment_id):
         order.paid_at = timezone.now()
         order.save(update_fields=["status", "payment_id", "paid_at"])
 
+        _, plan = _plan_for_amount(order.amount)
+        contacts = plan["contacts"]
         balance = _get_or_create_balance(order.user)
-        balance.remaining_contacts += GOLD_PLAN_CONTACTS
-        balance.total_contacts_purchased += GOLD_PLAN_CONTACTS
+        balance.remaining_contacts += contacts
+        balance.total_contacts_purchased += contacts
         balance.save(update_fields=[
             "remaining_contacts",
             "total_contacts_purchased",
@@ -113,12 +129,14 @@ def _mark_order_paid(order, payment_id):
 
 def _payment_matches_order(payment, order, expected_payment_id=None):
     payment_id = payment.get("id")
+    valid_amounts = {p["amount"] for p in PLAN_CONFIG.values()}
     return (
         isinstance(payment_id, str)
         and payment_id.startswith("pay_")
         and (expected_payment_id is None or payment_id == expected_payment_id)
         and payment.get("order_id") == order.provider_order_id
-        and payment.get("amount") == order.amount == GOLD_PLAN_AMOUNT
+        and payment.get("amount") == order.amount
+        and order.amount in valid_amounts
         and payment.get("currency") == order.currency == "INR"
         and payment.get("status") == "captured"
     )
@@ -157,22 +175,26 @@ class ContactCreditBalanceView(ClientMembershipView):
 
 class RazorpayOrderCreateView(ClientMembershipView):
     def post(self, request):
+        plan_key = str(request.data.get("plan", "gold")).lower()
+        if plan_key not in PLAN_CONFIG:
+            raise serializers.ValidationError({"plan": "Choose a valid plan: gold or diamond."})
+        plan = PLAN_CONFIG[plan_key]
         key_id, _ = _razorpay_credentials()
         receipt = f"cc-{uuid.uuid4().hex}"
         provider_order = _razorpay_request("POST", "/orders", {
-            "amount": GOLD_PLAN_AMOUNT,
+            "amount": plan["amount"],
             "currency": "INR",
             "receipt": receipt,
             "notes": {
                 "user_id": str(request.user.pk),
-                "plan": "gold_contacts_20",
+                "plan": plan["label"],
             },
         })
         provider_order_id = provider_order.get("id")
         if (
             not isinstance(provider_order_id, str)
             or not provider_order_id.startswith("order_")
-            or provider_order.get("amount") != GOLD_PLAN_AMOUNT
+            or provider_order.get("amount") != plan["amount"]
             or provider_order.get("currency") != "INR"
         ):
             logger.error("Razorpay returned an invalid membership order.")
@@ -181,14 +203,16 @@ class RazorpayOrderCreateView(ClientMembershipView):
         RazorpayOrder.objects.create(
             user=request.user,
             provider_order_id=provider_order_id,
-            amount=GOLD_PLAN_AMOUNT,
+            amount=plan["amount"],
             currency="INR",
         )
         return Response({
             "key_id": key_id,
             "order_id": provider_order_id,
-            "amount": GOLD_PLAN_AMOUNT,
+            "amount": plan["amount"],
             "currency": "INR",
+            "plan": plan_key,
+            "contacts": plan["contacts"],
         }, status=status.HTTP_201_CREATED)
 
 
@@ -236,8 +260,10 @@ class RazorpayPaymentVerifyView(ClientMembershipView):
             )
 
         balance = _mark_order_paid(order, values["razorpay_payment_id"])
+        plan_key, plan = _plan_for_amount(order.amount)
+        plan_name = plan_key.capitalize()
         return Response({
-            "message": "Gold membership activated. 20 contact credits were added.",
+            "message": f"{plan_name} membership activated. {plan['contacts']} contact credits were added.",
             "contacts_remaining": balance.remaining_contacts,
             "contacts_purchased": balance.total_contacts_purchased,
         })

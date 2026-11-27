@@ -252,6 +252,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
                 registration = Registration.objects.create(
                     user=user,
                     phone_verified=challenge.phone_verified,
+                    email_verified=challenge.email_verified,
                     **validated_data,
                 )
                 challenge.consumed_at = now

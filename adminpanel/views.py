@@ -26,6 +26,10 @@ from notifications.emailing import (
 import logging
 from datetime import date
 
+from django.http import HttpResponse
+
+from .reports import build_excel, payment_rows, registration_rows, summary_data
+
 logger = logging.getLogger(__name__)
 
 
@@ -762,3 +766,41 @@ class AdminPublishRegistrationView(APIView):
             "status": registration.status,
             "matrimony_id": registration.matrimony_id,
         })
+
+
+# =============================================================
+# REPORTS
+# =============================================================
+
+class AdminReportSummaryView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        return Response(summary_data(request.query_params))
+
+
+class AdminReportRegistrationsView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        return Response(registration_rows(request.query_params))
+
+
+class AdminReportPaymentsView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        return Response(payment_rows(request.query_params))
+
+
+class AdminReportExportView(APIView):
+    permission_classes = [IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        buf = build_excel(request.query_params)
+        response = HttpResponse(
+            buf.read(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = 'attachment; filename="matrimony_report.xlsx"'
+        return response

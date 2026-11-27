@@ -11,6 +11,10 @@ from .views import (
     AdminRejectRegistrationView,
     AdminPublishRegistrationView,
     PublicFAQListView,
+    AdminReportSummaryView,
+    AdminReportRegistrationsView,
+    AdminReportPaymentsView,
+    AdminReportExportView,
 )
 
 
@@ -54,4 +58,9 @@ urlpatterns = [
         AdminPublishRegistrationView.as_view(),
         name="admin-registration-publish",
     ),
+
+    path("reports/summary/", AdminReportSummaryView.as_view(), name="admin-report-summary"),
+    path("reports/registrations/", AdminReportRegistrationsView.as_view(), name="admin-report-registrations"),
+    path("reports/payments/", AdminReportPaymentsView.as_view(), name="admin-report-payments"),
+    path("reports/export/", AdminReportExportView.as_view(), name="admin-report-export"),
 ]

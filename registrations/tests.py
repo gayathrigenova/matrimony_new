@@ -1879,3 +1879,85 @@ class AuthenticatedProfileApiTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 403)
+
+
+class EmailVerifiedPersistenceTests(TestCase):
+    def setUp(self):
+        now = timezone.now()
+        future = now + timedelta(hours=1)
+        self.challenge = VerificationChallenge.objects.create(
+            email="ev-persist@example.com",
+            phone="+919988776655",
+            email_otp_hash="x",
+            phone_otp_hash="x",
+            email_verified=True,
+            phone_verified=True,
+            email_resend_after=future,
+            phone_resend_after=future,
+            email_expires_at=future,
+            phone_expires_at=future,
+            expires_at=future,
+        )
+
+    def _register(self):
+        s = RegistrationSerializer(data={
+            "full_name": "Persist Test",
+            "gender": "Male",
+            "date_of_birth": "1993-03-03",
+            "phone": "+919988776655",
+            "email": "ev-persist@example.com",
+            "password": "testpass123",
+            "verification_token": str(self.challenge.pk),
+        })
+        self.assertTrue(s.is_valid(), s.errors)
+        return s.save()
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
+    def test_email_verified_is_true_after_registration(self):
+        with self.captureOnCommitCallbacks(execute=False):
+            reg = self._register()
+        self.assertTrue(reg.email_verified)
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
+    def test_phone_verified_is_true_after_registration(self):
+        with self.captureOnCommitCallbacks(execute=False):
+            reg = self._register()
+        self.assertTrue(reg.phone_verified)
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
+    def test_both_verified_flags_persist_in_database(self):
+        with self.captureOnCommitCallbacks(execute=False):
+            reg = self._register()
+        reg.refresh_from_db()
+        self.assertTrue(reg.email_verified)
+        self.assertTrue(reg.phone_verified)
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
+    def test_email_verified_false_when_challenge_not_email_verified(self):
+        self.challenge.email_verified = False
+        self.challenge.save(update_fields=["email_verified"])
+        s = RegistrationSerializer(data={
+            "full_name": "Unverified Email",
+            "gender": "Male",
+            "date_of_birth": "1993-03-03",
+            "phone": "+919988776655",
+            "email": "ev-persist@example.com",
+            "password": "testpass123",
+            "verification_token": str(self.challenge.pk),
+        })
+        self.assertTrue(s.is_valid(), s.errors)
+        with self.assertRaises(Exception):
+            s.save()
+        self.assertFalse(User.objects.filter(email="ev-persist@example.com").exists())

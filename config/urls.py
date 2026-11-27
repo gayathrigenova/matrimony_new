@@ -69,7 +69,7 @@ urlpatterns = [
 
     # React admin routes must precede Django's /admin/ mount.
     re_path(
-        r"^admin/(?:login|dashboard|faqs|view/\d+)/?$",
+        r"^admin/(?:login|dashboard|faqs|reports|view/\d+)/?$",
         frontend,
         name="admin-frontend",
     ),

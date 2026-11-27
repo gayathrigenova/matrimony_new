@@ -25,6 +25,7 @@ import AdminLogin from "./pages/Admin/AdminLogin";
 import AdminDashboard from "./pages/Admin/AdminDashboard";
 import RegistrationReview from "./pages/Admin/RegistrationReview";
 import FAQManagement from "./pages/Admin/FAQManagement";
+import AdminReports from "./pages/Admin/AdminReports";
 
 // Client
 import ClientDashboard from "./pages/ClientDashboard";
@@ -102,6 +103,7 @@ function AppLayout() {
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin/dashboard" element={<AdminOnlyRoute><AdminDashboard /></AdminOnlyRoute>} />
           <Route path="/admin/faqs" element={<AdminOnlyRoute><FAQManagement /></AdminOnlyRoute>} />
+          <Route path="/admin/reports" element={<AdminOnlyRoute><AdminReports /></AdminOnlyRoute>} />
           <Route path="/admin/view/:id" element={<AdminOnlyRoute><RegistrationReview /></AdminOnlyRoute>} />
 
           {/* =========================

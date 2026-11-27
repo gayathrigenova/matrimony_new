@@ -350,6 +350,13 @@ export default function AdminDashboard() {
           Manage FAQs
         </button>
         <button
+  type="button"
+  onClick={() => navigate("/admin/reports")}
+  className="faq-management-link"
+>
+  Reports
+</button>
+        <button
           type="button"
           onClick={logout}
           className="logout-btn"

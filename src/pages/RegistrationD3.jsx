@@ -756,25 +756,6 @@ export default function RegistrationStep3() {
               />
             </div>
 
-            {/* District */}
-            <div className="reg3-form-group">
-              <label>
-                District <span>*</span>
-              </label>
-
-              <select
-                name="district"
-                value={formData.district}
-                onChange={handleChange}
-                required
-              >
-                <option value="">Select District</option>
-                {KERALA_DISTRICTS.map((district) => (
-                  <option key={district} value={district}>{district}</option>
-                ))}
-              </select>
-            </div>
-
             {/* Village */}
             <div className="reg3-form-group">
               <label>

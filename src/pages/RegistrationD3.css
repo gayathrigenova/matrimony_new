@@ -322,3 +322,153 @@
   .reg3-legal-modal { max-width: 100%; max-height: 90vh; }
   .reg3-legal-content { padding: 1.5rem 1.25rem; font-size: 0.9rem; }
 }
+
+/* =====================================================
+   LOGIN DETAILS SECTION (For Matrimony Login)
+===================================================== */
+
+.reg3-login-contact-field {
+  width: 100%;
+  min-width: 0;
+}
+
+.reg3-login-phone-row {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr) auto;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.reg3-login-email-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.reg3-otp-send-btn {
+  min-height: 44px;
+  padding: 0 0.9rem;
+  border: 0;
+  border-radius: 8px;
+  background: #087c47;
+  color: #fff;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 650;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.reg3-otp-send-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.reg3-otp-resend-btn {
+  min-height: 44px;
+  padding: 0 0.9rem;
+  border: 1px solid #087c47;
+  border-radius: 8px;
+  background: #fff;
+  color: #087c47;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 650;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.reg3-otp-resend-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.reg3-channel-status {
+  margin: 0.35rem 0 0;
+  font-size: 0.86rem;
+  font-weight: 650;
+  color: #a32121;
+}
+
+.reg3-channel-status.verified {
+  color: #087c47;
+}
+
+.reg3-channel-msg {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.86rem;
+}
+
+.reg3-channel-msg.success { color: #087c47; }
+.reg3-channel-msg.error   { color: #a32121; }
+.reg3-channel-msg.info    { color: #294d83; }
+
+.reg3-otp-block {
+  margin-top: 0.7rem;
+}
+
+.reg3-otp-countdown {
+  margin: 0 0 0.4rem;
+  font-size: 0.82rem;
+  color: #555;
+}
+
+.reg3-otp-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.reg3-field-error {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.86rem;
+  color: #b42318;
+}
+
+.reg3-verification-msg {
+  margin: 0.9rem 0;
+  padding: 0.7rem 1rem;
+  border-radius: 8px;
+  font-size: 0.92rem;
+}
+
+.reg3-verification-msg.error {
+  background: #fff0f0;
+  color: #a32121;
+}
+
+.reg3-verification-msg.info {
+  background: #eef4ff;
+  color: #294d83;
+}
+
+.reg3-verification-msg.success {
+  background: #eaf8ef;
+  color: #155d39;
+}
+
+@media (max-width: 680px) {
+  .reg3-login-phone-row {
+    grid-template-columns: 110px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+  }
+  .reg3-login-phone-row .reg3-otp-send-btn {
+    grid-column: 1 / -1;
+  }
+  .reg3-login-email-row {
+    grid-template-columns: 1fr;
+  }
+  .reg3-login-email-row .reg3-otp-send-btn {
+    width: 100%;
+  }
+  .reg3-otp-input-row {
+    grid-template-columns: 1fr 1fr;
+  }
+  .reg3-otp-input-row input {
+    grid-column: 1 / -1;
+  }
+}
